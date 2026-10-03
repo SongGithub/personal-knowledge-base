@@ -13,6 +13,7 @@ outside Git.
 Specification draft. No application code or private vault content has been
 added to this repository. The `KB` vault was prepared on 2026-10-03 with
 Ideas, Projects, Areas, Resources, Archive, and Wiki as its top-level layout.
+Unorganised material awaiting ingestion goes directly in `Resources`.
 A public template for the vault's AI instructions is in
 [`templates/vault/AGENTS.md`](templates/vault/AGENTS.md).
 

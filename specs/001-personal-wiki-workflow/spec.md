@@ -105,8 +105,8 @@ changing vault content.
 - **FR-001**: The user MUST be able to configure the vault location without
   editing project files or exposing its path in the public repository.
 - **FR-002**: The workflow MUST accept local Markdown files and saved web clips
-  as initial source types, place imported source files in a folder named `Raw`,
-  and preserve each imported source unmodified.
+  as initial source types from `Resources`, where unorganised material awaiting
+  ingestion is kept. It MUST preserve each source file unmodified.
 - **FR-003**: Each source record MUST include its origin, intake time, and a
   stable reference that proposed changes and answers can cite.
 - **FR-004**: Intake MUST produce one inspectable batch that lists all proposed
@@ -141,8 +141,8 @@ changing vault content.
 
 ### Key Entities
 
-- **Source**: Immutable imported item with origin, intake time, type, and
-  stable reference.
+- **Source**: Immutable item kept in `Resources`, with origin, intake time,
+  type, and stable reference.
 - **Batch**: A group of proposed changes with review status and source links.
 - **Wiki page**: Approved knowledge entry with evidence links.
 - **Index entry**: Link to an approved page in one of the six named folders.
@@ -172,8 +172,8 @@ changing vault content.
   instructions were then created, and the starter note was removed.
 - `AGENTS.md` is the file name used for the root AI-facing instructions; this
   matches the naming convention observed in the user's OpenClaw workspaces.
-- Imported source files belong in a folder named `Raw`. Its parent folder is
-  still to be confirmed. Placement of generated drafts and approved pages
+- Unorganised material awaiting ingestion and original source files belong
+  directly in `Resources`. Placement of generated drafts and approved pages
   remains open.
 - Web clips are saved local files or text with an origin URL when available.
   The workflow does not need to fetch live pages in the first release.
@@ -185,7 +185,6 @@ changing vault content.
 
 ## Review Questions
 
-- Is `Raw` a top-level folder or nested under another named folder?
 - Which folder holds approved generated pages, and where should review batches
   live?
 - Should rejected batches remain in an audit area, or may they be discarded
