@@ -54,8 +54,9 @@ section, and ask one supported, one unsupported, and one conflicting question.
 
 **Acceptance Scenarios**:
 
-1. **Given** approved pages, **When** the user opens the index, **Then** the
-   Resource, Ideas, Projects, Raw, and People sections lead to their entries.
+1. **Given** approved pages, **When** the user opens the index, **Then** it
+   provides navigation across Ideas, Projects, Areas, Resources, Archive, and
+   Wiki and links to their approved entries.
 2. **Given** a supported question, **When** the user asks it, **Then** the
    answer links to the relevant approved notes and source evidence.
 3. **Given** no supporting evidence, **When** the user asks a question,
@@ -112,8 +113,9 @@ changing vault content.
   unapplied so the user can recover without duplicate entries.
 - **FR-007**: Reprocessing MUST detect changes to existing canonical pages and
   surface conflicts before an overwrite is possible.
-- **FR-008**: The index MUST present Resource, Ideas, Projects, Raw, and People
-  sections and link to approved entries in each section.
+- **FR-008**: The wiki MUST use Ideas, Projects, Areas, Resources, Archive, and
+  Wiki as its named top-level folders. The index MUST navigate approved
+  entries across those folders without inventing another top-level taxonomy.
 - **FR-009**: An append-only activity log MUST record intake, approval or
   rejection, and applied page changes with references to the affected batch.
 - **FR-010**: The user MUST be able to search approved content by keywords and
@@ -134,7 +136,7 @@ changing vault content.
   stable reference.
 - **Batch**: A group of proposed changes with review status and source links.
 - **Wiki page**: Approved knowledge entry with evidence links.
-- **Index entry**: Link to an approved page in one of the five sections.
+- **Index entry**: Link to an approved page in one of the six named folders.
 - **Activity event**: Append-only record of intake, review, or applied change.
 
 ## Success Criteria *(mandatory)*
@@ -155,12 +157,12 @@ changing vault content.
 
 ## Assumptions
 
-- The `KB` vault currently has no user-created folder layout. The observed
-  vault contained only Obsidian's default welcome note on 2026-10-03.
-- Resource, Ideas, Projects, Raw, and People are the five first-level index
-  sections. For this draft, Raw means source intake; Resource means reviewed
-  reference material; Ideas, Projects, and People describe knowledge pages.
-  The precise classification rules remain subject to review.
+- The user identified Ideas, Projects, Areas, Resources, Archive, and Wiki as
+  the wiki folders. The locally observed `KB` vault contained only Obsidian's
+  default welcome note on 2026-10-03. The location of those folders requires
+  reconciliation before implementation.
+- The folder names do not by themselves establish where immutable sources,
+  generated drafts, and approved pages belong. Those roles remain open.
 - Web clips are saved local files or text with an origin URL when available.
   The workflow does not need to fetch live pages in the first release.
 - The first release serves one user on one Mac. Sync and concurrent edits
@@ -171,7 +173,9 @@ changing vault content.
 
 ## Review Questions
 
-- Do the five index sections match the intended meaning and order, especially
-  the difference between Raw and Resource?
+- Are the six folders in a different existing vault, or are they the intended
+  layout for `KB`?
+- Which folder holds approved generated pages, and where should immutable
+  source files and review batches live?
 - Should rejected batches remain in an audit area, or may they be discarded
   after the rejection event is recorded?

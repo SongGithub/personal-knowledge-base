@@ -11,9 +11,11 @@ outside Git.
 ## Current status
 
 Specification draft. No application code or vault content has been added. The
-existing `KB` vault was inspected on 2026-10-03 and contained only Obsidian's
-default welcome note, so the proposed folder layout can be reviewed without
-reconciling existing content.
+local `KB` vault was inspected on 2026-10-03 and contained only Obsidian's
+default welcome note. The user identified Ideas, Projects, Areas, Resources,
+Archive, and Wiki as the wiki folders. The specification records this layout;
+the location of those folders still needs to be reconciled with the observed
+local vault before implementation.
 
 Review the [constitution](.specify/memory/constitution.md) and
 [MVP feature specification](specs/001-personal-wiki-workflow/spec.md) before
