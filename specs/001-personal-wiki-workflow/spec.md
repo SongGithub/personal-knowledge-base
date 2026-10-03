@@ -105,7 +105,8 @@ changing vault content.
 - **FR-001**: The user MUST be able to configure the vault location without
   editing project files or exposing its path in the public repository.
 - **FR-002**: The workflow MUST accept local Markdown files and saved web clips
-  as initial source types and preserve each imported source unmodified.
+  as initial source types, place imported source files in a folder named `Raw`,
+  and preserve each imported source unmodified.
 - **FR-003**: Each source record MUST include its origin, intake time, and a
   stable reference that proposed changes and answers can cite.
 - **FR-004**: Intake MUST produce one inspectable batch that lists all proposed
@@ -171,8 +172,9 @@ changing vault content.
   instructions were then created, and the starter note was removed.
 - `AGENTS.md` is the file name used for the root AI-facing instructions; this
   matches the naming convention observed in the user's OpenClaw workspaces.
-- The folder names do not by themselves establish where immutable sources,
-  generated drafts, and approved pages belong. Those roles remain open.
+- Imported source files belong in a folder named `Raw`. Its parent folder is
+  still to be confirmed. Placement of generated drafts and approved pages
+  remains open.
 - Web clips are saved local files or text with an origin URL when available.
   The workflow does not need to fetch live pages in the first release.
 - The first release serves one user on one Mac. Sync and concurrent edits
@@ -183,7 +185,8 @@ changing vault content.
 
 ## Review Questions
 
-- Which folder holds approved generated pages, and where should immutable
-  source files and review batches live?
+- Is `Raw` a top-level folder or nested under another named folder?
+- Which folder holds approved generated pages, and where should review batches
+  live?
 - Should rejected batches remain in an audit area, or may they be discarded
   after the rejection event is recorded?
