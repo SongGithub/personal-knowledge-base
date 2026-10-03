@@ -10,12 +10,11 @@ outside Git.
 
 ## Current status
 
-Specification draft. No application code or vault content has been added. The
-local `KB` vault was inspected on 2026-10-03 and contained only Obsidian's
-default welcome note. The user identified Ideas, Projects, Areas, Resources,
-Archive, and Wiki as the wiki folders. The specification records this layout;
-the location of those folders still needs to be reconciled with the observed
-local vault before implementation.
+Specification draft. No application code or private vault content has been
+added to this repository. The `KB` vault was prepared on 2026-10-03 with
+Ideas, Projects, Areas, Resources, Archive, and Wiki as its top-level layout.
+A public template for the vault's AI instructions is in
+[`templates/vault/AGENTS.md`](templates/vault/AGENTS.md).
 
 Review the [constitution](.specify/memory/constitution.md) and
 [MVP feature specification](specs/001-personal-wiki-workflow/spec.md) before

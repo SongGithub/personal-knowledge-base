@@ -28,14 +28,17 @@ approval and the original sources never change.
 
 **Acceptance Scenarios**:
 
-1. **Given** two readable sources, **When** the user requests intake, **Then**
+1. **Given** the `KB` vault has only its starter note, **When** the layout is
+   prepared, **Then** its root contains the six named folders and AI-facing
+   instructions instead of the starter note.
+2. **Given** two readable sources, **When** the user requests intake, **Then**
    one reviewable batch lists proposed page changes and links each claim to a
    source passage or location.
-2. **Given** an unapproved batch, **When** the user rejects it, **Then** no
+3. **Given** an unapproved batch, **When** the user rejects it, **Then** no
    canonical wiki page or index entry changes.
-3. **Given** an approved batch, **When** changes are applied, **Then** the
+4. **Given** an approved batch, **When** changes are applied, **Then** the
    canonical pages, index, and activity log reflect the same batch.
-4. **Given** a source was processed before, **When** it is processed again,
+5. **Given** a source was processed before, **When** it is processed again,
    **Then** existing user edits are shown as potential conflicts rather than
    silently overwritten.
 
@@ -129,6 +132,11 @@ changing vault content.
   workflow without defining a separate vault format.
 - **FR-014**: Private source content and generated wiki pages MUST remain
   outside the repository; example data used in the repo MUST be synthetic.
+- **FR-015**: The vault root MUST contain AI-facing instructions and the six
+  named folders. The default Obsidian welcome note MUST be removed when these
+  instructions replace it. The public repository MUST provide a reusable
+  instruction template without containing private vault data. The OpenClaw
+  workflow MUST read the vault's root instructions before working with it.
 
 ### Key Entities
 
@@ -157,10 +165,12 @@ changing vault content.
 
 ## Assumptions
 
-- The user identified Ideas, Projects, Areas, Resources, Archive, and Wiki as
-  the wiki folders. The locally observed `KB` vault contained only Obsidian's
-  default welcome note on 2026-10-03. The location of those folders requires
-  reconciliation before implementation.
+- Ideas, Projects, Areas, Resources, Archive, and Wiki are the intended
+  top-level folders in `KB`. The local vault had only Obsidian's default
+  welcome note when first inspected on 2026-10-03; the six folders and root
+  instructions were then created, and the starter note was removed.
+- `AGENTS.md` is the file name used for the root AI-facing instructions; this
+  matches the naming convention observed in the user's OpenClaw workspaces.
 - The folder names do not by themselves establish where immutable sources,
   generated drafts, and approved pages belong. Those roles remain open.
 - Web clips are saved local files or text with an origin URL when available.
@@ -173,8 +183,6 @@ changing vault content.
 
 ## Review Questions
 
-- Are the six folders in a different existing vault, or are they the intended
-  layout for `KB`?
 - Which folder holds approved generated pages, and where should immutable
   source files and review batches live?
 - Should rejected batches remain in an audit area, or may they be discarded
