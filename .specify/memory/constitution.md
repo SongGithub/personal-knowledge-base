@@ -6,6 +6,8 @@ Sync impact report
 - 2026-10-05 amendment proposal: replace the six generic top-level folders with
   the owner's seven domain categories; update the feature specification,
   templates, vault guidance, and index requirements accordingly.
+- 2026-10-05 retrieval experiment amendment: permit disposable, fully local
+  semantic retrieval for a measured comparison with lexical search.
 - Ratification remains pending user review.
 -->
 # Personal Knowledge Base Constitution
@@ -44,8 +46,12 @@ this project's tools.
 
 The MVP MUST use the simplest workflow that meets the approved specification.
 Each capability MUST have an observable acceptance check, including failure
-cases. Hosted services, vector storage, and semantic retrieval require a
-separate documented need and amendment.
+cases. Hosted services and production semantic retrieval require a separate
+documented need and amendment. A local retrieval experiment MAY use disposable
+vector storage after its need, privacy boundary, benchmark, and exit criteria
+are specified. Markdown MUST remain canonical and indexes MUST be rebuildable.
+Private content MUST NOT be sent to an external embedding service without
+explicit user approval. Experiment results MUST justify any later adoption.
 
 ### VI. Domain-Organised Vault
 
@@ -84,4 +90,4 @@ expanded principles, and patch for clarifications. Every feature review MUST
 check its specification and implementation against this constitution. This
 initial draft is proposed for review and is not yet ratified.
 
-**Version**: 0.2.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05
+**Version**: 0.3.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05

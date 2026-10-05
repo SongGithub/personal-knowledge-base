@@ -1,0 +1,11 @@
+[
+  {
+    "id": "fictional_policy",
+    "paraphrases": [
+      "What is the current Orion travel policy?",
+      "Which travel rule applies to Orion?"
+    ],
+    "expected_paths": ["Canonical/Orion travel.md"],
+    "canonical_expected": true
+  }
+]
