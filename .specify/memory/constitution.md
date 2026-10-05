@@ -3,7 +3,10 @@ Sync impact report
 - Initial proposal: template -> 0.1.0 draft.
 - Added principles: Privacy; Evidence; Human control; Portability; Small increments.
 - Added sections: Product boundaries; Development workflow.
-- Follow-up: Ratification awaits user review.
+- 2026-10-05 amendment proposal: replace the six generic top-level folders with
+  the owner's seven domain categories; update the feature specification,
+  templates, vault guidance, and index requirements accordingly.
+- Ratification remains pending user review.
 -->
 # Personal Knowledge Base Constitution
 
@@ -44,6 +47,18 @@ Each capability MUST have an observable acceptance check, including failure
 cases. Hosted services, vector storage, and semantic retrieval require a
 separate documented need and amendment.
 
+### VI. Domain-Organised Vault
+
+The vault MUST use the owner's seven top-level knowledge categories:
+`基础设施`, `个人履历`, `投资`, `书籍和出版物`, `自媒体内容`, `家庭事务`,
+and `个人健康档案`. New knowledge MUST be filed under the category that owns
+its subject. Shared navigation and operational guidance belong to
+`基础设施`; source material and project artifacts belong with their subject
+category, not in a competing generic top-level taxonomy. The vault index MUST
+make all seven categories discoverable. Category-specific subfolders MAY be
+used where they improve retrieval, but MUST NOT introduce a second competing
+top-level scheme.
+
 ## Product Boundaries
 
 The first release serves one user on one Mac with the existing `KB` Obsidian
@@ -69,4 +84,4 @@ expanded principles, and patch for clarifications. Every feature review MUST
 check its specification and implementation against this constitution. This
 initial draft is proposed for review and is not yet ratified.
 
-**Version**: 0.1.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-03
+**Version**: 0.2.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05
