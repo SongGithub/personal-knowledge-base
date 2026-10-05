@@ -20,6 +20,7 @@ class RetrievalExperimentTest(unittest.TestCase):
     def test_authority_and_deterministic_fusion(self):
         self.assertEqual(r.authority("Canonical/Policy.md", "", {"Canonical/Policy.md": "canonical"}), "canonical")
         self.assertEqual(r.authority("Sources/Source Archives/old.md", "", {}), "archive")
+        self.assertEqual(r.authority("Archive/old.md", "", {}), "archive")
         self.assertEqual(r.authority("Sources/_Review/new.md", "", {}), "unverified")
         self.assertEqual(r.authority("any.md", "", {"any.md": "verified"}), "verified")
         search = object.__new__(r.Search)

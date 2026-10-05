@@ -77,7 +77,8 @@ def authority(path: str, text: str, overrides: dict[str, str]) -> str:
         return "unverified"
     if Path(path).name == "AGENTS.md" or re.search(r"^(status|authority):\s*(canonical|binding)", frontmatter, re.M):
         return "canonical"
-    if "source archives/" in low_path or "/archive/" in low_path:
+    path_parts = {part.lower() for part in Path(path).parts}
+    if path_parts & {"archive", "archives", "source archives", "source snapshots"}:
         return "archive"
     if re.search(r"^status:\s*(verified|confirmed)", frontmatter, re.M):
         return "verified"
@@ -124,7 +125,7 @@ def build(vault: Path, db: sqlite3.Connection, url: str, model: str, overrides: 
         manifest.append((p.relative_to(vault).as_posix(), hashlib.sha256(raw).hexdigest(), raw.decode("utf-8-sig")))
     source_hash = hashlib.sha256(json.dumps([(p, h) for p, h, _ in manifest], ensure_ascii=False).encode()).hexdigest()
     override_hash = hashlib.sha256(json.dumps(overrides, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    wanted = {"source_hash": source_hash, "model": model, "override_hash": override_hash, "chunker": "paragraph-1500-v1", "authority_rules": "v2"}
+    wanted = {"source_hash": source_hash, "model": model, "override_hash": override_hash, "chunker": "paragraph-1500-v1", "authority_rules": "v3"}
     current = dict(db.execute("SELECT key,value FROM metadata"))
     if current == wanted and db.execute("SELECT COUNT(*) FROM chunks WHERE vector IS NULL").fetchone()[0] == 0:
         return {"notes": len(manifest), "chunks": db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0], "rebuilt": False, "source_hash": source_hash}

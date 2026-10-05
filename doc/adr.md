@@ -17,19 +17,22 @@ an archive override canonical knowledge.
 
 ## Measured comparison
 
+This is the rerun after the vault update: 116 notes, 512 chunks, seven logical
+cases, 22 paraphrases, and three repetitions per paraphrase.
+
 | Metric | Lexical | Vector | Hybrid |
 |---|---:|---:|---:|
-| Top-1 accuracy | 36.4% | **68.2%** | 63.6% |
-| Top-3 recall | 54.5% | **95.5%** | 77.3% |
-| Top-5 recall | 54.5% | **95.5%** | 81.8% |
+| Top-1 accuracy | 31.8% | **72.7%** | 68.2% |
+| Top-3 recall | 50.0% | **95.5%** | 81.8% |
+| Top-5 recall | 54.5% | **95.5%** | 86.4% |
 | Same top-1 for identical repeated queries | 100% | 100% | 100% |
 | Ranking variance across repeats | 0.0 | 0.0 | 0.0 |
 | Paraphrase agreement | 0% | **57.1%** | 42.9% |
-| Canonical top-1 on applicable cases | 66.7% | 66.7% | **100%** |
+| Canonical top-1 on applicable cases | 55.6% | 77.8% | **100%** |
 | Wrong archive override | 33.3% | 22.2% | **0%** |
 | Unverified/draft top-1 | 9.1% | 13.6% | 9.1% |
-| Median retrieval latency | **1.1 ms** | 22.9 ms | 24.4 ms |
-| P95 retrieval latency | **2.1 ms** | 28.0 ms | 29.0 ms |
+| Median retrieval latency | **1.0 ms** | 16.8 ms | 18.0 ms |
+| P95 retrieval latency | **2.2 ms** | 21.7 ms | 22.5 ms |
 
 All three produced identical top-five rankings for each query across two separate
 process runs. Repeatability was therefore perfect in this deterministic setup;
