@@ -8,6 +8,9 @@ Sync impact report
   templates, vault guidance, and index requirements accordingly.
 - 2026-10-05 retrieval experiment amendment: permit disposable, fully local
   semantic retrieval for a measured comparison with lexical search.
+- 2026-10-05 shared retrieval amendment proposal: allow an owner-approved,
+  vendor-neutral local retrieval service over the rebuildable SQLite index,
+  with client-specific connectivity kept in separate adapters.
 - Ratification remains pending user review.
 -->
 # Personal Knowledge Base Constitution
@@ -52,6 +55,14 @@ vector storage after its need, privacy boundary, benchmark, and exit criteria
 are specified. Markdown MUST remain canonical and indexes MUST be rebuildable.
 Private content MUST NOT be sent to an external embedding service without
 explicit user approval. Experiment results MUST justify any later adoption.
+A local retrieval service over a local, rebuildable SQLite index MAY be adopted
+for cross-client access after a separate specification defines its privacy,
+authority, and availability behavior. The retrieval core MUST NOT depend on a
+single AI vendor. Client protocols and connectivity bridges MUST remain
+adapters around the core. Each client MUST receive only the retrieved notes
+needed for that request; sending those excerpts to a hosted model remains an
+explicit user action and must be made clear. Hosted storage is outside this
+amendment.
 
 ### VI. Domain-Organised Vault
 
@@ -90,4 +101,4 @@ expanded principles, and patch for clarifications. Every feature review MUST
 check its specification and implementation against this constitution. This
 initial draft is proposed for review and is not yet ratified.
 
-**Version**: 0.3.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05
+**Version**: 0.4.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05

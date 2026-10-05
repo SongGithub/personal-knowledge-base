@@ -65,3 +65,25 @@ through oMLX with the cached BGE-M3 model.
 The detailed per-query report is local to the machine running the experiment.
 See `specs/002-retrieval-quality-experiment/` for the experiment specification
 and implementation plan.
+
+## Proposed architecture: vendor-neutral shared retrieval
+
+- **Date:** 2026-10-05
+- **Status:** Proposed; implementation not started
+
+The owner wants ChatGPT, Codex, and OpenClaw to access the same KB. Keep
+Markdown canonical and keep a local, rebuildable SQLite index behind one
+vendor-neutral retrieval core. Clients call a read-only interface; they never
+open the SQLite file or implement separate authority ranking. Use MCP as the
+first assistant-tool protocol adapter, starting with local stdio for OpenClaw.
+Keep ChatGPT connectivity, authentication, and any tunnel in a separate
+client-specific adapter. The retrieval core and database schema must not depend
+on OpenAI.
+
+The ChatGPT adapter remains future work. When used with a hosted model, only
+requested result excerpts should cross into that provider's conversation
+context, with that data boundary disclosed. The full vault and index remain
+local. The proposed constitution amendment and implementation requirements are
+in [`specs/003-shared-kb-retrieval/`](../specs/003-shared-kb-retrieval/spec.md).
+The [OpenClaw connection guide](../docs/openclaw-kb-connection.md) documents the
+planned configuration and clearly marks the not-yet-implemented server command.

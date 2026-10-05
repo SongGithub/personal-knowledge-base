@@ -12,8 +12,11 @@ outside Git.
 
 ## Current status
 
-Specification draft. No application code or private vault content has been
-added to this repository. The target `KB` layout uses the owner's seven
+The local retrieval experiment is implemented. A shared local retrieval
+service and MCP adapter are specified but not yet implemented; see the
+[shared retrieval spec](specs/003-shared-kb-retrieval/spec.md) and
+[OpenClaw connection guide](docs/openclaw-kb-connection.md). The target `KB`
+layout uses the owner's seven
 top-level categories: 基础设施, 个人履历, 投资, 书籍和出版物, 自媒体内容,
 家庭事务, and 个人健康档案. The vault migration is awaiting review. The
 specification places subject-specific sources and projects under their owning
