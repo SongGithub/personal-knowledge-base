@@ -1,10 +1,12 @@
 # Personal Knowledge Base
 
-> 知识库的价值=知识的密度X调用的频率X验证的深度
+> The value of a knowledge base = knowledge density x retrieval frequency x
+> depth of verification
 
 A private, portable wiki workflow for turning sources into reviewable knowledge
 pages and answering questions with evidence. The first release targets one user,
-an Obsidian vault, a small local CLI, and OpenClaw.
+an Obsidian vault, a small local CLI, and assistant clients such as OpenClaw and
+Codex.
 
 This repository contains the project specification and, later, code and
 templates. Private sources and generated wiki pages belong in the user's vault,
@@ -12,16 +14,17 @@ outside Git.
 
 ## Current status
 
-The local retrieval experiment is implemented. A shared local retrieval
-service and MCP adapter are specified but not yet implemented; see the
-[shared retrieval spec](specs/003-shared-kb-retrieval/spec.md) and
-[OpenClaw connection guide](docs/openclaw-kb-connection.md). The target `KB`
-layout uses the owner's seven
-top-level categories: 基础设施, 个人履历, 投资, 书籍和出版物, 自媒体内容,
-家庭事务, and 个人健康档案. The vault migration is awaiting review. The
-specification places subject-specific sources and projects under their owning
-category, with shared governance and navigation under `基础设施`.
-A public template for the vault's AI instructions is in
+The local retrieval experiment and read-only local MCP service are implemented.
+See the [shared retrieval spec](specs/003-shared-kb-retrieval/spec.md) and
+[OpenClaw connection guide](docs/openclaw-kb-connection.md) to configure
+OpenClaw. ChatGPT-specific connectivity remains a separate, unimplemented
+adapter. The `KB` vault keeps its top-level folders (`Ideas`, `Projects`,
+`Areas`, `Resources`, `Archive`, `Wiki`, `Personal Facts`) and records the
+owner's domain categories as index notes nested inside them, with sources in
+`Resources`. The vault folders are still Chinese; a link-safe migration to
+English names is planned in
+[vault-english-migration.md](docs/vault-english-migration.md) and is not yet
+approved. A public template for the vault's AI instructions is in
 [`templates/vault/AGENTS.md`](templates/vault/AGENTS.md).
 
 Review the [constitution](.specify/memory/constitution.md) and

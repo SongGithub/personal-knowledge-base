@@ -8,9 +8,20 @@ Sync impact report
   templates, vault guidance, and index requirements accordingly.
 - 2026-10-05 retrieval experiment amendment: permit disposable, fully local
   semantic retrieval for a measured comparison with lexical search.
-- 2026-10-05 shared retrieval amendment proposal: allow an owner-approved,
+- 2026-10-05 shared retrieval amendment: owner approved implementation of a
   vendor-neutral local retrieval service over the rebuildable SQLite index,
-  with client-specific connectivity kept in separate adapters.
+  with client-specific connectivity kept in separate adapters. Overall
+  constitution ratification remains pending review.
+- 2026-10-06 naming and structure correction: Principle VI is rewritten as a
+  domain index layer nested inside the vault's existing top-level folders. The
+  2026-10-05 amendment proposal above wrongly described the seven domain
+  categories as top-level folders replacing the generic taxonomy; the owner's
+  vault keeps `Ideas`, `Projects`, `Areas`, `Resources`, `Archive`, `Wiki`, and
+  `Personal Facts` at the top level. The domain categories are recorded in
+  English (`Infrastructure`, `Personal Facts`, `Investments`, `Family Affairs`,
+  `Books and Publications`, `Media Content`, `Personal Health Records`) as the
+  target naming; the vault folders are still Chinese and a separate link-safe
+  migration is planned.
 - Ratification remains pending user review.
 -->
 # Personal Knowledge Base Constitution
@@ -64,17 +75,17 @@ needed for that request; sending those excerpts to a hosted model remains an
 explicit user action and must be made clear. Hosted storage is outside this
 amendment.
 
-### VI. Domain-Organised Vault
+### VI. Domain Index Layer
 
-The vault MUST use the owner's seven top-level knowledge categories:
-`基础设施`, `个人履历`, `投资`, `书籍和出版物`, `自媒体内容`, `家庭事务`,
-and `个人健康档案`. New knowledge MUST be filed under the category that owns
-its subject. Shared navigation and operational guidance belong to
-`基础设施`; source material and project artifacts belong with their subject
-category, not in a competing generic top-level taxonomy. The vault index MUST
-make all seven categories discoverable. Category-specific subfolders MAY be
-used where they improve retrieval, but MUST NOT introduce a second competing
-top-level scheme.
+The vault MUST keep its existing top-level folders - `Ideas`, `Projects`,
+`Areas`, `Resources`, `Archive`, `Wiki`, and `Personal Facts` - and MUST NOT
+replace them with a competing top-level taxonomy. The owner's domain categories
+are recorded as index notes nested inside those folders, so that every domain
+has one discoverable entry point. Sources and pending intake live in
+`Resources`; `Areas` holds ongoing responsibilities; `Projects` holds bounded
+work; `Archive` preserves source snapshots unmodified. The vault index MUST
+make every domain category discoverable, and category-specific subfolders MAY
+be used where they improve retrieval.
 
 ## Product Boundaries
 
@@ -101,4 +112,4 @@ expanded principles, and patch for clarifications. Every feature review MUST
 check its specification and implementation against this constitution. This
 initial draft is proposed for review and is not yet ratified.
 
-**Version**: 0.4.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-05
+**Version**: 0.5.0 (draft) | **Ratified**: pending review | **Last Amended**: 2026-10-06

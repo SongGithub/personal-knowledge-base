@@ -29,8 +29,9 @@ approval and the original sources never change.
 **Acceptance Scenarios**:
 
 1. **Given** the `KB` vault is prepared, **When** the user opens its root,
-   **Then** it contains the seven named domain folders and AI-facing
-   instructions instead of a competing generic top-level taxonomy.
+   **Then** it contains the top-level content folders, a domain index note for
+   each category, and AI-facing instructions instead of a competing top-level
+   taxonomy.
 2. **Given** two readable sources, **When** the user requests intake, **Then**
    one reviewable batch lists proposed page changes and links each claim to a
    source passage or location.
@@ -58,8 +59,8 @@ section, and ask one supported, one unsupported, and one conflicting question.
 **Acceptance Scenarios**:
 
 1. **Given** approved pages, **When** the user opens the index, **Then** it
-   provides navigation across 基础设施, 个人履历, 投资, 书籍和出版物,
-   自媒体内容, 家庭事务, and 个人健康档案 and links to their approved entries.
+   provides navigation across the domain index notes nested under the vault's
+   top-level folders and links to their approved entries.
 2. **Given** a supported question, **When** the user asks it, **Then** the
    answer links to the relevant approved notes and source evidence.
 3. **Given** no supporting evidence, **When** the user asks a question,
@@ -105,8 +106,8 @@ changing vault content.
 - **FR-001**: The user MUST be able to configure the vault location without
   editing project files or exposing its path in the public repository.
 - **FR-002**: The workflow MUST accept local Markdown files and saved web clips
-  as initial source types from the subject's category, in a clearly marked
-  review or source subfolder. It MUST preserve each source file unmodified.
+  as initial source types from `Resources`, where unorganised material awaiting
+  ingestion is kept. It MUST preserve each source file unmodified.
 - **FR-003**: Each source record MUST include its origin, intake time, and a
   stable reference that proposed changes and answers can cite.
 - **FR-004**: Intake MUST produce one inspectable batch that lists all proposed
@@ -117,12 +118,12 @@ changing vault content.
   unapplied so the user can recover without duplicate entries.
 - **FR-007**: Reprocessing MUST detect changes to existing canonical pages and
   surface conflicts before an overwrite is possible.
-- **FR-008**: The vault MUST use these seven named top-level categories:
-  `基础设施`, `个人履历`, `投资`, `书籍和出版物`, `自媒体内容`, `家庭事务`, and
-  `个人健康档案`. The index MUST navigate approved entries across all seven.
-  Subject-specific subfolders MAY be used within a category. Generic workflow
-  folders such as Areas, Projects, Resources, Archive, and Wiki MUST NOT remain
-  as competing top-level categories.
+- **FR-008**: The vault MUST keep its existing top-level folders: Ideas,
+  Projects, Areas, Resources, Archive, Wiki, and Personal Facts. The owner's
+  domain categories MUST be recorded as index notes nested inside those
+  folders, and the index MUST navigate approved entries across those domains.
+  Sources MUST live in `Resources`. Neither the top-level folders nor the
+  domain layer may be replaced by a competing taxonomy.
 - **FR-009**: An append-only activity log MUST record intake, approval or
   rejection, and applied page changes with references to the affected batch.
 - **FR-010**: The user MUST be able to search approved content by keywords and
@@ -136,8 +137,8 @@ changing vault content.
   workflow without defining a separate vault format.
 - **FR-014**: Private source content and generated wiki pages MUST remain
   outside the repository; example data used in the repo MUST be synthetic.
-- **FR-015**: The vault root MUST contain AI-facing instructions and the seven
-  named category folders. The default Obsidian welcome note MUST be removed
+- **FR-015**: The vault root MUST contain AI-facing instructions and the
+  top-level content folders. The default Obsidian welcome note MUST be removed
   when these instructions replace it. The public repository MUST provide a
   reusable instruction template without containing private vault data. The
   OpenClaw workflow MUST read the vault's root instructions before working
@@ -145,12 +146,11 @@ changing vault content.
 
 ### Key Entities
 
-- **Source**: Immutable item kept under the category that owns its subject,
-  with origin, intake time, type, and stable reference.
+- **Source**: Immutable item kept in `Resources`, with origin, intake time,
+  type, and stable reference.
 - **Batch**: A group of proposed changes with review status and source links.
 - **Wiki page**: Approved knowledge entry with evidence links.
-- **Index entry**: Link to an approved page in one of the seven named
-  categories.
+- **Index entry**: Link to an approved page reached through a domain index note.
 - **Activity event**: Append-only record of intake, review, or applied change.
 
 ## Success Criteria *(mandatory)*
@@ -171,16 +171,18 @@ changing vault content.
 
 ## Assumptions
 
-- The seven owner-selected top-level folders in `KB` are `基础设施`, `个人履历`,
-  `投资`, `书籍和出版物`, `自媒体内容`, `家庭事务`, and `个人健康档案`.
-  The previous generic six-folder layout is superseded. Each category may use
-  subject-specific subfolders, with shared vault governance and navigation in
-  `基础设施`.
+- The `KB` vault keeps seven top-level folders: `Ideas`, `Projects`, `Areas`,
+  `Resources`, `Archive`, `Wiki`, and `Personal Facts`. The owner's domain
+  categories are recorded as index notes nested inside them, and the
+  `Personal Facts` folder is itself the home of the personal-facts domain. The
+  vault folders are currently Chinese; a link-safe migration to English names
+  is planned but not yet approved.
 - `AGENTS.md` is the file name used for the root AI-facing instructions; this
   matches the naming convention observed in the user's OpenClaw workspaces.
-- Unorganised material awaiting ingestion and original source files belong
-  in the subject's category, in a clearly marked review or source subfolder.
-  Placement of generated drafts and approved pages remains open.
+- Unorganised material awaiting ingestion and original source files belong in
+  `Resources`, with pending review batches in `Resources/_Review/`. Approved
+  pages belong in `Wiki/`, whose index note is the vault entry point.
+  Preserved source snapshots stay unmodified in `Archive/`.
 - Web clips are saved local files or text with an origin URL when available.
   The workflow does not need to fetch live pages in the first release.
 - The first release serves one user on one Mac. Sync and concurrent edits
@@ -191,7 +193,10 @@ changing vault content.
 
 ## Review Questions
 
-- Which folder holds approved generated pages, and where should review batches
-  live?
-- Should rejected batches remain in an audit area, or may they be discarded
-  after the rejection event is recorded?
+- Resolved by the vault: approved generated pages belong in `Wiki/`, and
+  pending review batches live in `Resources/_Review/`.
+- Open: should rejected batches remain in an audit area, or may they be
+  discarded after the rejection event is recorded?
+- Open: should `Archive/` source snapshots keep their original filenames when
+  the vault is migrated to English names? Imported sources must stay
+  unmodified, which argues for leaving preserved snapshots as they are.
