@@ -57,6 +57,18 @@ class RetrievalExperimentTest(unittest.TestCase):
             self.assertEqual(report["summary"]["hybrid"]["canonical_top1_rate"], 1.0)
             self.assertEqual(len(report["results"]["hybrid"]), 6)
 
+    def test_source_snapshot_does_not_follow_markdown_symlinks_outside_vault(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            vault = root / "vault"
+            vault.mkdir()
+            outside = root / "outside.md"
+            outside.write_text("private content", encoding="utf-8")
+            (vault / "linked.md").symlink_to(outside)
+            (vault / "local.md").write_text("local content", encoding="utf-8")
+            manifest, _ = r.source_snapshot(vault)
+        self.assertEqual([entry[0] for entry in manifest], ["local.md"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,12 +17,13 @@ an archive override canonical knowledge.
 
 ## Measured comparison
 
-This is the rerun after the vault update: 116 notes, 512 chunks, seven logical
-cases, 22 paraphrases, and three repetitions per paraphrase.
+This is the rerun after the latest vault update and MCP service implementation:
+117 notes, 515 chunks, seven logical cases, 22 paraphrases, and three
+repetitions per paraphrase.
 
 | Metric | Lexical | Vector | Hybrid |
 |---|---:|---:|---:|
-| Top-1 accuracy | 31.8% | **72.7%** | 68.2% |
+| Top-1 accuracy | 31.8% | **72.7%** | 63.6% |
 | Top-3 recall | 50.0% | **95.5%** | 81.8% |
 | Top-5 recall | 54.5% | **95.5%** | 86.4% |
 | Same top-1 for identical repeated queries | 100% | 100% | 100% |
@@ -31,12 +32,12 @@ cases, 22 paraphrases, and three repetitions per paraphrase.
 | Canonical top-1 on applicable cases | 55.6% | 77.8% | **100%** |
 | Wrong archive override | 33.3% | 22.2% | **0%** |
 | Unverified/draft top-1 | 9.1% | 13.6% | 9.1% |
-| Median retrieval latency | **1.0 ms** | 16.8 ms | 18.0 ms |
-| P95 retrieval latency | **2.2 ms** | 21.7 ms | 22.5 ms |
+| Median retrieval latency | **1.9 ms** | 20.8 ms | 22.5 ms |
+| P95 retrieval latency | **3.1 ms** | 24.3 ms | 26.9 ms |
 
-All three produced identical top-five rankings for each query across two separate
-process runs. Repeatability was therefore perfect in this deterministic setup;
-the meaningful consistency difference was agreement across paraphrases.
+All three produced identical top-five rankings for each query across repeated
+calls. Repeatability was therefore perfect in this deterministic setup; the
+meaningful consistency difference was agreement across paraphrases.
 
 ## Decision
 
@@ -66,10 +67,10 @@ The detailed per-query report is local to the machine running the experiment.
 See `specs/002-retrieval-quality-experiment/` for the experiment specification
 and implementation plan.
 
-## Proposed architecture: vendor-neutral shared retrieval
+## Architecture decision: vendor-neutral shared retrieval
 
 - **Date:** 2026-10-05
-- **Status:** Proposed; implementation not started
+- **Status:** Accepted for implementation; ChatGPT adapter remains future work
 
 The owner wants ChatGPT, Codex, and OpenClaw to access the same KB. Keep
 Markdown canonical and keep a local, rebuildable SQLite index behind one
@@ -80,10 +81,13 @@ Keep ChatGPT connectivity, authentication, and any tunnel in a separate
 client-specific adapter. The retrieval core and database schema must not depend
 on OpenAI.
 
-The ChatGPT adapter remains future work. When used with a hosted model, only
-requested result excerpts should cross into that provider's conversation
-context, with that data boundary disclosed. The full vault and index remain
-local. The proposed constitution amendment and implementation requirements are
-in [`specs/003-shared-kb-retrieval/`](../specs/003-shared-kb-retrieval/spec.md).
-The [OpenClaw connection guide](../docs/openclaw-kb-connection.md) documents the
-planned configuration and clearly marks the not-yet-implemented server command.
+This architecture is now implemented for personal local use, but the retrieval
+strategy remains experimental: this small benchmark does not establish a
+general production-quality winner. OpenClaw and Codex use the local read-only
+stdio MCP service. ChatGPT requires a separate Secure MCP Tunnel setup and
+clear handling of hosted excerpts. The full vault and index remain local. The
+approved feature specification and implementation plan are in
+[`specs/003-shared-kb-retrieval/`](../specs/003-shared-kb-retrieval/spec.md).
+The [OpenClaw connection guide](../docs/openclaw-kb-connection.md) documents
+configuration for OpenClaw and Codex. Both local clients are configured to use
+the MCP service; ChatGPT needs its separate Secure MCP Tunnel setup.

@@ -1,6 +1,8 @@
 # Feature Specification: Shared Local KB Retrieval
 
-**Status**: Draft for review, 2026-10-05. **Constitution**: 0.4.0 draft amendment.
+**Status**: Approved for implementation, 2026-10-05. **Constitution**: 0.4.0
+draft amendment (owner-approved for this feature; overall constitution
+ratification remains pending).
 
 ## Need
 

@@ -117,13 +117,28 @@ def database(path: Path) -> sqlite3.Connection:
     return db
 
 
-def build(vault: Path, db: sqlite3.Connection, url: str, model: str, overrides: dict[str, str], batch_size: int = 16) -> dict:
-    paths = sorted(p for p in vault.rglob("*.md") if ".obsidian" not in p.parts and p.is_file())
+def source_snapshot(vault: Path) -> tuple[list[tuple[str, str, str]], str]:
+    root = vault.resolve()
+    paths = []
+    for path in vault.rglob("*.md"):
+        if ".obsidian" in path.parts or path.is_symlink() or not path.is_file():
+            continue
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            continue
+        paths.append(path)
+    paths.sort()
     manifest = []
-    for p in paths:
-        raw = p.read_bytes()
-        manifest.append((p.relative_to(vault).as_posix(), hashlib.sha256(raw).hexdigest(), raw.decode("utf-8-sig")))
-    source_hash = hashlib.sha256(json.dumps([(p, h) for p, h, _ in manifest], ensure_ascii=False).encode()).hexdigest()
+    for path in paths:
+        raw = path.read_bytes()
+        manifest.append((path.relative_to(vault).as_posix(), hashlib.sha256(raw).hexdigest(), raw.decode("utf-8-sig")))
+    source_hash = hashlib.sha256(json.dumps([(path, digest) for path, digest, _ in manifest], ensure_ascii=False).encode()).hexdigest()
+    return manifest, source_hash
+
+
+def build(vault: Path, db: sqlite3.Connection, url: str, model: str, overrides: dict[str, str], batch_size: int = 16) -> dict:
+    manifest, source_hash = source_snapshot(vault)
     override_hash = hashlib.sha256(json.dumps(overrides, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     wanted = {"source_hash": source_hash, "model": model, "override_hash": override_hash, "chunker": "paragraph-1500-v1", "authority_rules": "v3"}
     current = dict(db.execute("SELECT key,value FROM metadata"))
@@ -183,12 +198,17 @@ class Search:
         return [p for p, score in sorted(scores.items(), key=lambda x: (-x[1], x[0])) if score > 0]
 
     def vector(self, query: str) -> list[str]:
+        ranking, _ = self.vector_with_scores(query)
+        return ranking
+
+    def vector_with_scores(self, query: str) -> tuple[list[str], np.ndarray]:
         q = embed([query], self.url, self.model)[0]
         similarities = self.vectors @ q
         scores = defaultdict(lambda: -1.0)
         for row, score in zip(self.rows, similarities):
             scores[row[0]] = max(scores[row[0]], float(score))
-        return [p for p, _ in sorted(scores.items(), key=lambda x: (-x[1], x[0]))]
+        ranking = [p for p, _ in sorted(scores.items(), key=lambda x: (-x[1], x[0]))]
+        return ranking, similarities
 
     def hybrid(self, lex: list[str], vec: list[str]) -> list[str]:
         # Vector-weighted RRF; authority changes ordering only for near ties.

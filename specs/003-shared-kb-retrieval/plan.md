@@ -17,6 +17,13 @@ dependency of the local service. Keep embeddings and index generation local and
 keep the SQLite file outside iCloud and the vault. Preserve a local CLI path for
 benchmarking and direct use.
 
+The implementation keeps the retrieval engine in `retrieval_experiment.py`
+and adds the vendor-neutral `KBService` facade and stdio JSON-RPC/MCP transport
+in `kb_mcp_server.py`. It uses the existing NumPy dependency and Python
+standard library; no MCP SDK, hosted service, or new database is required. The
+service opens SQLite read-only and does not rebuild the index or embeddings
+during requests.
+
 ## Constitution check
 
 - Proposed amendment 0.4.0 permits an owner-approved local retrieval service
