@@ -64,11 +64,11 @@ class KBService:
                 _, current_source_hash = retrieval.source_snapshot(self.vault)
                 expected_authority = authority_digest(self.overrides)
                 if metadata.get("source_hash") != current_source_hash:
-                    raise IndexUnavailable("KB index is stale because the vault changed. Rebuild the local index.")
+                    raise IndexUnavailable("KB index is out of date because the vault changed. Refresh the local index.")
                 if metadata.get("model") != self.model:
                     raise IndexUnavailable("KB index uses a different embedding model. Rebuild it with the configured model.")
                 if self.authority_supplied and metadata.get("override_hash") != expected_authority:
-                    raise IndexUnavailable("KB authority settings changed. Rebuild the local index.")
+                    raise IndexUnavailable("KB authority settings changed. Refresh the local index.")
                 if not rows or missing_vectors:
                     raise IndexUnavailable("KB index is empty or incomplete. Rebuild the local index.")
                 return retrieval.Search(db, self.endpoint, self.model)

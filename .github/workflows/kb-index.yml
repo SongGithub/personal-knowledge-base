@@ -1,0 +1,76 @@
+name: KB index reconciliation
+
+# The KB vault is local (iCloud Obsidian) and embeddings come from a loopback
+# oMLX server, so indexing must run on the owner's Mac, not a GitHub-hosted
+# runner. Register the machine as a self-hosted runner labelled `macOS`.
+#
+# Optional repository variables (set on the runner; never commit real paths):
+#   PKB_VAULT, PKB_DATA_DIR, PKB_PYTHON,
+#   PKB_EMBEDDING_ENDPOINT (default http://127.0.0.1:8000/v1),
+#   PKB_EMBEDDING_MODEL   (default bge-m3-mlx-4bit)
+# Without PKB_VAULT/PKB_DATA_DIR the CLI discovers the vault under the iCloud
+# Obsidian container and the index under Application Support.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: kb-index-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on:
+      - self-hosted
+      - macOS
+    timeout-minutes: 30
+    env:
+      PKB_VAULT: ${{ vars.PKB_VAULT }}
+      PKB_DATA_DIR: ${{ vars.PKB_DATA_DIR }}
+      PKB_PYTHON: ${{ vars.PKB_PYTHON }}
+      PKB_EMBEDDING_ENDPOINT: ${{ vars.PKB_EMBEDDING_ENDPOINT || 'http://127.0.0.1:8000/v1' }}
+      PKB_EMBEDDING_MODEL: ${{ vars.PKB_EMBEDDING_MODEL || 'bge-m3-mlx-4bit' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python="${PKB_PYTHON:-python3}"
+          "$python" -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Verify the local KB vault
+        run: |
+          set -euo pipefail
+          python="${PKB_PYTHON:-python3}"
+          vault="${PKB_VAULT:-}"
+          if [ -z "$vault" ]; then
+            vault="$("$python" -c 'import retrieval_experiment as r; print(r.vault_default())')"
+          fi
+          if [ ! -d "$vault" ]; then
+            echo "::error::KB vault not found. Set the PKB_VAULT repository variable on the runner."
+            exit 1
+          fi
+          echo "KB vault found: $vault"
+
+      - name: Verify the local oMLX embedding endpoint
+        run: |
+          set -euo pipefail
+          if ! curl -fsS --max-time 10 "$PKB_EMBEDDING_ENDPOINT/models" >/dev/null; then
+            echo "::error::Local embedding endpoint $PKB_EMBEDDING_ENDPOINT is unreachable."
+            exit 1
+          fi
+
+      - name: Reconcile the local KB index
+        run: |
+          set -euo pipefail
+          python="${PKB_PYTHON:-python3}"
+          args=(index --model "$PKB_EMBEDDING_MODEL" --endpoint "$PKB_EMBEDDING_ENDPOINT")
+          if [ -n "${PKB_VAULT:-}" ]; then args+=(--vault "$PKB_VAULT"); fi
+          if [ -n "${PKB_DATA_DIR:-}" ]; then args+=(--data-dir "$PKB_DATA_DIR"); fi
+          "$python" retrieval_experiment.py "${args[@]}"

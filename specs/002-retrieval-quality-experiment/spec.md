@@ -39,3 +39,30 @@ Adopt hybrid only if it materially improves paraphrased/vague top-1 or recall
 without increasing archive override or draft top-1, and remains stable across
 repeats and processes. Otherwise retain lexical or keep semantic retrieval
 experimental. Do not silently change this threshold after seeing results.
+
+## Incremental indexing requirements (added 2026-10-07)
+
+The persistent local index must be refreshed incrementally rather than rebuilt
+whenever a single note changes.
+
+- **II-001**: Indexing MUST reconcile the persistent index against the vault per
+  note. A matching whole-vault hash MUST NOT be the only path that avoids work,
+  and a differing whole-vault hash MUST NOT by itself trigger a full rebuild.
+- **II-002**: Unchanged notes MUST keep their existing chunks and vectors
+  exactly; the embedding function MUST NOT be called for them.
+- **II-003**: Added, changed, and deleted notes MUST be reconciled independently.
+  Only chunks of added or changed notes may be re-embedded, and deleted notes
+  MUST have their note and chunk rows removed.
+- **II-004**: Authority-only changes (a private authority manifest or an
+  authority-rule change with unchanged content) MUST update tiers without
+  re-embedding.
+- **II-005**: A full rebuild happens only when index compatibility changes
+  (embedding model, chunker version, or index schema version) or when the index
+  is corrupt or has missing vectors. Model, chunker, authority rules and index
+  schema version MUST be recorded in index metadata.
+- **II-006**: Indexing MUST report reconciliation statistics that clearly
+  distinguish a no-op, an incremental update, an authority-only refresh, and a
+  full rebuild, including added, changed, deleted and unchanged note counts and
+  the number of chunks embedded.
+- **II-007**: The whole-vault source hash MAY be retained for provenance and
+  freshness detection.

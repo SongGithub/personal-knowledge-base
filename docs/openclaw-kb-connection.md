@@ -101,8 +101,11 @@ configuration.
    `..` traversal.
 5. Retrieval is read-only. Use the separate review and explicit-approval
    workflow for proposed canonical edits.
-6. If search reports a stale or missing index, ask the operator to rebuild it.
-   Do not fall back to reading arbitrary filesystem paths.
+6. If search reports an out-of-date or missing index, ask the operator to
+   refresh it. A normal refresh is incremental and re-embeds only added or
+   changed notes; a full rebuild is only needed after a model, chunker or
+   index-schema change or a corrupt index. Do not fall back to reading
+   arbitrary filesystem paths.
 
 The MCP process and SQLite index stay local. If OpenClaw or Codex uses a hosted
 model, the excerpts returned by these tools enter that model's conversation
@@ -141,11 +144,21 @@ ChatGPT app automatically.
 
 ## Rebuild and troubleshooting
 
-Rebuild the disposable index with the command in the Install section. Indexing
+Refresh the disposable index with the command in the Install section. Indexing
 reads Markdown and writes only local derived data; it does not edit the vault
-or send note text to an external embedding API. Search reports missing or stale
-indexes instead of rebuilding silently. After rebuilding, rerun
-`openclaw mcp doctor personal-kb --probe`. Do not remove the SQLite file while
-the MCP process is using it.
+or send note text to an external embedding API.
+
+A refresh is incremental. New notes are indexed, changed notes are reindexed,
+deleted notes are removed, and embeddings for unchanged notes stay intact, so
+only added or changed notes are re-embedded. A full rebuild is required only
+for a compatibility change (embedding model, chunker version, or index schema
+version) or a corrupt or partially embedded index; those values are recorded in
+the index metadata.
+
+Search reports an out-of-date or missing index instead of rebuilding silently.
+After a refresh, rerun `openclaw mcp doctor personal-kb --probe`. Do not remove
+the SQLite file while the MCP process is using it. A scheduled reconciliation
+(`.github/workflows/kb-index.yml`, self-hosted macOS runner) can refresh the
+index on a timer. The Obsidian Markdown vault remains the source of truth.
 
 For current OpenClaw MCP configuration and diagnostics, see its [MCP client guide](https://docs.openclaw.ai/tools/mcp) and [MCP CLI reference](https://docs.openclaw.ai/cli/mcp).

@@ -31,9 +31,12 @@ yet expose a supported client interface.
 - Given a configured local vault and a built index, when OpenClaw searches a
   query, then it uses the same deterministic authority-aware ranking as the
   local CLI and returns note-relative paths and excerpts.
-- Given that the index is absent or stale, when a client requests search, then
-  the service reports the condition and the documented rebuild action; it does
-  not silently scan a different vault or create a hosted index.
+- Given that the index is absent or out of date, when a client requests
+  search, then the service reports the condition and the documented refresh
+  action. A normal refresh is incremental and re-embeds only added or changed
+  notes; a compatibility-breaking change (embedding model, chunker, or index
+  schema) or a corrupt index requires a full rebuild. The service does not
+  silently scan a different vault or create a hosted index.
 - Given a canonical note and a semantically similar archive note, when they
   compete for a result, then the service applies the specified authority policy
   and deterministic path tie-break.
@@ -83,6 +86,11 @@ yet expose a supported client interface.
 - **FR-012**: The public repository MUST contain only code, specifications, and
   synthetic fixtures. Private paths, note contents, index files, embeddings,
   and real benchmark cases/reports MUST stay outside Git.
+- **FR-013**: The index refresh path MUST be incremental. Unchanged notes MUST
+  keep their existing vectors, and only added or changed notes MUST be
+  re-embedded; a full rebuild MUST be limited to a compatibility change
+  (embedding model, chunker, or index schema) or a corrupt index. The service
+  MUST continue to use the same SQLite index and retrieval policy.
 
 ## Out of scope
 

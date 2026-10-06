@@ -19,6 +19,9 @@ from urllib.request import Request, urlopen
 import numpy as np
 
 MODEL = "bge-m3-mlx-4bit"
+CHUNKER = "paragraph-1500-v1"
+AUTHORITY_RULES = "v3"
+INDEX_SCHEMA_VERSION = "1"
 AUTHORITY = {"canonical": 0, "verified": 1, "ordinary": 2, "archive": 3, "unverified": 4}
 STOP = set("a an and are as at be did do for from how i in is it my of on or the to was were what when why with 的 了 吗 我 是 在 有 和".split())
 
@@ -137,37 +140,89 @@ def source_snapshot(vault: Path) -> tuple[list[tuple[str, str, str]], str]:
     return manifest, source_hash
 
 
-def build(vault: Path, db: sqlite3.Connection, url: str, model: str, overrides: dict[str, str], batch_size: int = 16) -> dict:
-    manifest, source_hash = source_snapshot(vault)
-    override_hash = hashlib.sha256(json.dumps(overrides, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    wanted = {"source_hash": source_hash, "model": model, "override_hash": override_hash, "chunker": "paragraph-1500-v1", "authority_rules": "v3"}
-    current = dict(db.execute("SELECT key,value FROM metadata"))
-    if current == wanted and db.execute("SELECT COUNT(*) FROM chunks WHERE vector IS NULL").fetchone()[0] == 0:
-        return {"notes": len(manifest), "chunks": db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0], "rebuilt": False, "source_hash": source_hash}
-    if all(current.get(key) == wanted[key] for key in ("source_hash", "model", "chunker")) and db.execute("SELECT COUNT(*) FROM chunks WHERE vector IS NULL").fetchone()[0] == 0:
-        with db:
-            db.executemany("UPDATE notes SET tier=? WHERE path=?", [(authority(path, content, overrides), path) for path, _, content in manifest])
-            db.execute("DELETE FROM metadata")
-            db.executemany("INSERT INTO metadata VALUES(?,?)", wanted.items())
-        return {"notes": len(manifest), "chunks": db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0], "rebuilt": False, "authority_refreshed": True, "source_hash": source_hash}
-    with db:
-        db.execute("DELETE FROM chunks")
-        db.execute("DELETE FROM notes")
-        db.execute("DELETE FROM metadata")
-        for path, digest, content in manifest:
-            db.execute("INSERT INTO notes VALUES(?,?,?)", (path, authority(path, content, overrides), digest))
-            for i, part in enumerate(chunks(content)):
-                db.execute("INSERT INTO chunks VALUES(?,?,?,NULL)", (path, i, part))
-    rows = list(db.execute("SELECT path,ordinal,text FROM chunks ORDER BY path,ordinal"))
+def _index_metadata(model: str, source_hash: str, override_hash: str) -> dict:
+    return {"source_hash": source_hash, "model": model, "override_hash": override_hash, "chunker": CHUNKER, "authority_rules": AUTHORITY_RULES, "index_schema_version": INDEX_SCHEMA_VERSION}
+
+
+def _embed_rows(db: sqlite3.Connection, rows: list[tuple[str, int, str]], url: str, model: str, batch_size: int) -> None:
     for start in range(0, len(rows), batch_size):
         batch = rows[start:start + batch_size]
         vectors = embed([row[2] for row in batch], url, model)
         with db:
             db.executemany("UPDATE chunks SET vector=? WHERE path=? AND ordinal=?", [(vector.tobytes(), row[0], row[1]) for row, vector in zip(batch, vectors)])
         print(f"embedded {min(start + batch_size, len(rows))}/{len(rows)}", flush=True)
+
+
+def build(vault: Path, db: sqlite3.Connection, url: str, model: str, overrides: dict[str, str], batch_size: int = 16) -> dict:
+    """Reconcile the disposable index with the Markdown vault, per note.
+
+    Unchanged notes keep their existing chunks and vectors untouched. Only
+    added or changed notes are rechunked and embedded; deleted notes are
+    removed. A full rebuild happens only when index compatibility changes
+    (embedding model, chunker, or index schema) or vectors are missing.
+    """
+    manifest, source_hash = source_snapshot(vault)
+    override_hash = hashlib.sha256(json.dumps(overrides, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    wanted = _index_metadata(model, source_hash, override_hash)
+    current = dict(db.execute("SELECT key,value FROM metadata"))
+    existing = {path: (tier, sha) for path, tier, sha in db.execute("SELECT path,tier,sha256 FROM notes")}
+    null_vectors = db.execute("SELECT COUNT(*) FROM chunks WHERE vector IS NULL").fetchone()[0]
+    compatible = all(current.get(key) == wanted[key] for key in ("model", "chunker", "index_schema_version"))
+
+    result = {"notes": len(manifest), "chunks": 0, "added": 0, "changed": 0, "deleted": 0, "unchanged": len(manifest), "embedded_chunks": 0, "full_rebuild": False, "authority_refreshed": False, "rebuilt": False, "mode": "noop", "source_hash": source_hash}
+
+    if not compatible or null_vectors:
+        with db:
+            db.execute("DELETE FROM chunks")
+            db.execute("DELETE FROM notes")
+            db.execute("DELETE FROM metadata")
+            for path, digest, content in manifest:
+                db.execute("INSERT INTO notes VALUES(?,?,?)", (path, authority(path, content, overrides), digest))
+                for i, part in enumerate(chunks(content)):
+                    db.execute("INSERT INTO chunks VALUES(?,?,?,NULL)", (path, i, part))
+            db.executemany("INSERT INTO metadata VALUES(?,?)", wanted.items())
+        pending = list(db.execute("SELECT path,ordinal,text FROM chunks ORDER BY path,ordinal"))
+        _embed_rows(db, pending, url, model, batch_size)
+        result.update(added=len(manifest), changed=0, deleted=len(existing), unchanged=0, embedded_chunks=len(pending), full_rebuild=True, rebuilt=True, mode="full", chunks=db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0])
+        return result
+
+    current_paths = {path for path, _, _ in manifest}
+    added = [entry for entry in manifest if entry[0] not in existing]
+    changed = [entry for entry in manifest if entry[0] in existing and existing[entry[0]][1] != entry[1]]
+    deleted = [path for path in existing if path not in current_paths]
+    unchanged = [entry for entry in manifest if entry[0] in existing and existing[entry[0]][1] == entry[1]]
+    new_tiers = {path: authority(path, content, overrides) for path, _, content in manifest}
+    tier_updates = [(new_tiers[path], path) for path, _, _ in manifest if path in existing and existing[path][0] != new_tiers[path]]
+
+    result.update(added=len(added), changed=len(changed), deleted=len(deleted), unchanged=len(unchanged))
+    if not (added or changed or deleted or tier_updates or current != wanted):
+        result["chunks"] = db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+        return result
+
+    if added or changed or deleted:
+        result["mode"] = "incremental"
+    else:
+        result["mode"] = "authority"
+        result["authority_refreshed"] = bool(tier_updates)
+
     with db:
+        for path in deleted:
+            db.execute("DELETE FROM chunks WHERE path=?", (path,))
+            db.execute("DELETE FROM notes WHERE path=?", (path,))
+        for tier, path in tier_updates:
+            db.execute("UPDATE notes SET tier=? WHERE path=?", (tier, path))
+        for path, digest, content in added + changed:
+            db.execute("DELETE FROM chunks WHERE path=?", (path,))
+            db.execute("INSERT INTO notes(path,tier,sha256) VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET tier=excluded.tier, sha256=excluded.sha256", (path, new_tiers[path], digest))
+            for i, part in enumerate(chunks(content)):
+                db.execute("INSERT INTO chunks VALUES(?,?,?,NULL)", (path, i, part))
+        db.execute("DELETE FROM metadata")
         db.executemany("INSERT INTO metadata VALUES(?,?)", wanted.items())
-    return {"notes": len(manifest), "chunks": len(rows), "rebuilt": True, "source_hash": source_hash}
+
+    pending = list(db.execute("SELECT path,ordinal,text FROM chunks WHERE vector IS NULL ORDER BY path,ordinal"))
+    _embed_rows(db, pending, url, model, batch_size)
+    result.update(embedded_chunks=len(pending), chunks=db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0])
+    return result
 
 
 class Search:

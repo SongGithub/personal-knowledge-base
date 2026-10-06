@@ -26,3 +26,25 @@ to note ranks, with normalized relative path as final tie break.
 Use synthetic fixtures for deterministic ranking, authority and metric tests.
 Then run real-vault indexing and benchmark, inspect per-case failures, verify
 ignored private artifacts, and commit only public code/specs/fixtures.
+
+## Incremental reconciliation algorithm (added 2026-10-07)
+
+Refresh replaces whole-vault rebuilds as the default path:
+
+1. **Vault scan** - enumerate Markdown notes (never editing them) and compute a
+   SHA-256 per note.
+2. **Compare per-note hashes** - load indexed note paths and hashes from SQLite
+   and classify each note as added, changed, deleted, or unchanged.
+3. **Delete stale notes** - remove note and chunk rows for deleted paths.
+4. **Reindex changed/new notes** - recompute authority, upsert the note row, drop
+   the old chunks for that path, and rechunk only that note.
+5. **Preserve vectors** - leave chunks and vectors of unchanged notes untouched
+   and embed only the newly created chunks.
+6. **Update metadata** - record model, chunker, authority rules, index schema
+   version, source hash and override hash.
+7. **Integrity check** - confirm no chunk has a missing vector; a missing vector
+   or an incompatible model/chunker/schema forces a full rebuild instead.
+
+The compatibility gate keeps the store disposable: a model, chunker or schema
+change, or a corrupt or partial index, triggers one complete rebuild. Authority
+changes never re-embed; they update tiers in place.
