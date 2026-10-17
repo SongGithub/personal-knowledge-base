@@ -16,8 +16,8 @@ phases:
       - '/tmp/pkb-native/bin/python -m pip install --only-binary=:all: --disable-pip-version-check -r requirements-cloud-test.txt -r infra/requirements.txt -c /tmp/pkb-cloud-versions.txt'
   pre_build:
     commands:
-      - /tmp/pkb-native/bin/cfn-lint --non-zero-exit-code warning --regions ap-southeast-2 --template infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
-      - /tmp/pkb-native/bin/python -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator -v
+      - /tmp/pkb-native/bin/python tools/lint_infra.py infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
+      - /tmp/pkb-native/bin/python -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_lint -v
   build:
     commands:
       - |

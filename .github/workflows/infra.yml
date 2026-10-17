@@ -16,6 +16,7 @@ on:
       - 'tools/aws_session.py'
       - 'tools/bootstrap_native_pipeline.py'
       - 'tools/google_owner_subject.py'
+      - 'tools/lint_infra.py'
   push:
     branches: [main]
     paths:
@@ -32,6 +33,7 @@ on:
       - 'tools/aws_session.py'
       - 'tools/bootstrap_native_pipeline.py'
       - 'tools/google_owner_subject.py'
+      - 'tools/lint_infra.py'
   workflow_dispatch:
 
 permissions:
@@ -56,7 +58,9 @@ jobs:
           "$RUNNER_TEMP/pkb-infra-validation/bin/python" -m pip install --disable-pip-version-check -r infra/requirements.txt
           echo "$RUNNER_TEMP/pkb-infra-validation/bin" >> "$GITHUB_PATH"
       - name: Validate templates without AWS credentials
-        run: cfn-lint --non-zero-exit-code warning --regions ap-southeast-2 --template infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
+        run: |
+          python3 tools/lint_infra.py infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
+          python3 -m unittest tests.test_cloud_lint -v
 
   cloud-check:
     name: Verify synthetic HTTP and Lambda adapters
