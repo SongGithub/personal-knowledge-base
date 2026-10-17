@@ -1,0 +1,188 @@
+name: KB infrastructure
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra.yml'
+      - 'cloud_kb/**'
+      - 'tests/test_cloud_*.py'
+      - 'tests/fixtures/cloud-kb/**'
+      - 'requirements-cloud*'
+      - 'tools/build_cloud_release.py'
+      - 'tools/verify_cloud_mcp.py'
+      - 'tools/seed_mock_kb.py'
+      - 'tools/deploy_cloud_app.py'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra.yml'
+      - 'cloud_kb/**'
+      - 'tests/test_cloud_*.py'
+      - 'tests/fixtures/cloud-kb/**'
+      - 'requirements-cloud*'
+      - 'tools/build_cloud_release.py'
+      - 'tools/verify_cloud_mcp.py'
+      - 'tools/seed_mock_kb.py'
+      - 'tools/deploy_cloud_app.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kb-infra-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate CloudFormation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install pinned infrastructure validator
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/pkb-infra-validation"
+          "$RUNNER_TEMP/pkb-infra-validation/bin/python" -m pip install --disable-pip-version-check -r infra/requirements.txt
+          echo "$RUNNER_TEMP/pkb-infra-validation/bin" >> "$GITHUB_PATH"
+      - name: Validate templates without AWS credentials
+        run: cfn-lint --non-zero-exit-code warning --regions ap-southeast-2 --template infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json
+
+  cloud-check:
+    name: Verify synthetic HTTP and Lambda adapters
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install cloud verification dependencies
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/pkb-cloud-check"
+          "$RUNNER_TEMP/pkb-cloud-check/bin/python" -m pip install --only-binary=:all: --disable-pip-version-check -r requirements-cloud-test.txt
+          echo "$RUNNER_TEMP/pkb-cloud-check/bin" >> "$GITHUB_PATH"
+      - name: Exercise mock Markdown and access failures without AWS credentials
+        run: python3 -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy -v
+      - name: Build code-only Lambda release from hashed Linux wheels
+        run: python3 tools/build_cloud_release.py --output "$RUNNER_TEMP/pkb-cloud-release.zip"
+
+  deploy:
+    name: Deploy development foundation
+    needs: [validate, cloud-check]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.INFRA_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: pkb-dev-foundation
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-southeast-2
+      AWS_PAGER: ''
+      CFN_EXECUTION_ROLE_ARN: ${{ secrets.AWS_CFN_EXECUTION_ROLE_ARN }}
+      RUNTIME_BOUNDARY_ARN: ${{ secrets.AWS_RUNTIME_BOUNDARY_ARN }}
+      AUTH_SECRET_ARN: ${{ secrets.AWS_MCP_AUTH_SECRET_ARN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check bootstrap configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CFN_EXECUTION_ROLE_ARN"
+          test -n "$RUNTIME_BOUNDARY_ARN"
+      - name: Assume scoped AWS role through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_INFRA_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-2
+          role-session-name: kb-infra-${{ github.run_id }}
+          role-duration-seconds: 3600
+          mask-aws-account-id: true
+          unset-current-credentials: true
+      - name: Deploy the versioned foundation template
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws cloudformation deploy \
+            --region "$AWS_REGION" \
+            --stack-name pkb-dev-foundation \
+            --template-file infra/foundation.template.json \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn "$CFN_EXECUTION_ROLE_ARN" \
+            --parameter-overrides \
+              ProjectName=pkb \
+              Environment=dev \
+              EnablePointInTimeRecovery=true \
+              LogRetentionDays=14 \
+              "ExecutionRolePermissionsBoundaryArn=$RUNTIME_BOUNDARY_ARN" \
+              "AuthSecretArn=$AUTH_SECRET_ARN" \
+              ApprovedEmbeddingModelArn= \
+            --tags Project=pkb Environment=dev ManagedBy=CloudFormation \
+            --no-fail-on-empty-changeset
+      - name: Record infrastructure status
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(aws cloudformation describe-stacks \
+            --region "$AWS_REGION" --stack-name pkb-dev-foundation \
+            --query 'Stacks[0].StackStatus' --output text)
+          printf '### KB foundation\n\nStack status: `%s`\n\nCommit: `%s`\n' \
+            "$status" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-application:
+    name: Deploy development MCP application
+    needs: [validate, cloud-check, deploy]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.INFRA_DEPLOY_ENABLED == 'true' && vars.MCP_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: pkb-dev-application
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-southeast-2
+      CFN_EXECUTION_ROLE_ARN: ${{ secrets.AWS_CFN_EXECUTION_ROLE_ARN }}
+      AUTH_SECRET_ARN: ${{ secrets.AWS_MCP_AUTH_SECRET_ARN }}
+      GOOGLE_OWNER_SUB: ${{ secrets.KB_GOOGLE_OWNER_SUB }}
+      CLIENT_REDIRECT_URIS: ${{ secrets.KB_CLIENT_REDIRECT_URIS }}
+      MCP_SEED_MOCK: ${{ vars.MCP_SEED_MOCK }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check application configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CFN_EXECUTION_ROLE_ARN"
+          test -n "$AUTH_SECRET_ARN"
+          test -n "$GOOGLE_OWNER_SUB"
+          test -n "$CLIENT_REDIRECT_URIS"
+      - name: Assume scoped deployment role through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_INFRA_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-2
+          role-session-name: kb-app-${{ github.run_id }}
+          role-duration-seconds: 3600
+          mask-aws-account-id: true
+          unset-current-credentials: true
+      - name: Install deployment SDK
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/pkb-cloud-deploy"
+          "$RUNNER_TEMP/pkb-cloud-deploy/bin/python" -m pip install --only-binary=:all: --disable-pip-version-check boto3==1.43.114
+          echo "$RUNNER_TEMP/pkb-cloud-deploy/bin" >> "$GITHUB_PATH"
+      - name: Build code-only Linux Lambda artifact
+        run: python3 tools/build_cloud_release.py --output "$RUNNER_TEMP/pkb-cloud-release.zip"
+      - name: Deploy reviewed application and check unauthenticated rejection
+        run: python3 tools/deploy_cloud_app.py "$RUNNER_TEMP/pkb-cloud-release.zip"

@@ -1,0 +1,214 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Google-protected read-only KB MCP HTTP application. Requires foundation, approved runtime secret permission and a built code artifact.",
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "pkb",
+      "AllowedPattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "MinLength": 2,
+      "MaxLength": 16
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": [
+        "dev",
+        "prod"
+      ]
+    },
+    "ReleaseBucket": {
+      "Type": "String"
+    },
+    "ReleaseKey": {
+      "Type": "String",
+      "AllowedPattern": "^releases/[0-9a-f]{64}[.]zip$"
+    },
+    "ReleaseVersion": {
+      "Type": "String"
+    },
+    "VaultBucket": {
+      "Type": "String"
+    },
+    "IndexBucket": {
+      "Type": "String"
+    },
+    "ControlTable": {
+      "Type": "String"
+    },
+    "ApiExecutionRoleArn": {
+      "Type": "String",
+      "AllowedPattern": "^arn:[a-z0-9-]+:iam::[0-9]{12}:role/[a-zA-Z0-9+=,.@_/-]+$"
+    },
+    "AuthSecretArn": {
+      "Type": "String",
+      "AllowedPattern": "^arn:[a-z0-9-]+:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[a-zA-Z0-9/_+=.@-]+$"
+    },
+    "OwnerGoogleSubject": {
+      "Type": "String",
+      "NoEcho": true,
+      "MinLength": 1
+    },
+    "ClientRedirectUris": {
+      "Type": "String",
+      "NoEcho": true,
+      "Description": "JSON list of exact allowed MCP client callback URIs; no wildcard defaults."
+    },
+    "HttpApiId": {
+      "Type": "String",
+      "AllowedPattern": "^[a-z0-9]+$",
+      "Description": "API identity anchored by the separately reviewed trust bootstrap."
+    }
+  },
+  "Resources": {
+    "ApiFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-api"
+        },
+        "Role": {
+          "Ref": "ApiExecutionRoleArn"
+        },
+        "Runtime": "python3.12",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "cloud_kb.api.handler",
+        "MemorySize": 256,
+        "Timeout": 25,
+        "ReservedConcurrentExecutions": 2,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ReleaseBucket"
+          },
+          "S3Key": {
+            "Ref": "ReleaseKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "ReleaseVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "PKB_BASE_URL": {
+              "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+            },
+            "PKB_VAULT_BUCKET": {
+              "Ref": "VaultBucket"
+            },
+            "PKB_INDEX_BUCKET": {
+              "Ref": "IndexBucket"
+            },
+            "PKB_CONTROL_TABLE": {
+              "Ref": "ControlTable"
+            },
+            "PKB_OWNER_SUB": {
+              "Ref": "OwnerGoogleSubject"
+            },
+            "PKB_SECRET_ARN": {
+              "Ref": "AuthSecretArn"
+            },
+            "PKB_CLIENT_REDIRECT_URIS": {
+              "Ref": "ClientRedirectUris"
+            },
+            "FASTMCP_LOG_LEVEL": "WARNING"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          }
+        ]
+      }
+    },
+    "ProxyIntegration": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiId"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ApiFunction",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 29000
+      }
+    },
+    "ProxyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiId"
+        },
+        "RouteKey": "$default",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "ProxyIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "DefaultStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiId"
+        },
+        "StageName": "$default",
+        "AutoDeploy": true,
+        "DefaultRouteSettings": {
+          "ThrottlingBurstLimit": 10,
+          "ThrottlingRateLimit": 2
+        }
+      }
+    },
+    "AllowHttpApi": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ApiFunction"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApiId}/*"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "McpEndpoint": {
+      "Value": {
+        "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/mcp"
+      }
+    },
+    "GoogleRedirectUri": {
+      "Value": {
+        "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/auth/callback"
+      }
+    }
+  }
+}
