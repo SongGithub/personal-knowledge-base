@@ -51,6 +51,42 @@ Private stack outputs/build handles are saved to a mode-0600 temporary operator
 record. They are not published as Git artifacts. Release success must be read from
 the actual CodeBuild/CloudFormation state, then the HTTPS OAuth verifier must pass.
 
+The first real application attempt exposed a missing API Gateway stage tagging
+permission and rolled back. Both bootstrap variants now scope the provider's
+`TagResource`/`UntagResource` actions to the anchored API. The release helper can
+retry only an application in `ROLLBACK_COMPLETE` whose resource inventory consists
+entirely of deleted Lambda/API resources. It refuses live resources, retained
+resources, buckets and other data resources. Foundation recovery is never implicit.
+
+`tools/lint_infra.py` runs the pinned validator with its IAM action catalogue
+extended by exactly those two actions from the live AWS stage provider schema.
+Version 1.57.2's bundled catalogue omits them. No rule is suppressed: regression
+checks verify that an invented misspelling still fails W3037.
+
+## Owner identity and mock grant
+
+Create a dedicated Google web client after owner approval, with the deployed
+origin's `/auth/callback` and the one-time owner callback
+`http://localhost:8766/google/callback`. Download its JSON to a private file.
+`tools/google_owner_subject.py` performs a loopback PKCE login and uses the
+maintained Google verifier to check audience, scopes, expiry and verified email.
+It saves only the stable subject/email in a new mode-0600 owner file; authorization
+codes and access tokens are not printed or saved. Bind that verified subject in
+the private bootstrap parameter and store the client credentials in its existing
+Secrets Manager JSON, preserving the signing/encryption keys.
+
+After deploying that real configuration, `tools/verify_cloud_mcp.py` accepts
+`--owner-file` and `--aws-env-file` for an explicit owner-admin setup step. It
+checks the actual endpoint and deployed owner binding, obtains the MCP client's
+identity from the authenticated SDK, then conditionally creates only a 30-minute
+`kb:read` grant for the exact synthetic note. Existing broader/revoked/expired
+grants are preserved and require owner review. Normal AI clients receive no AWS
+credentials and cannot grant themselves access. `--authorization-file` stores
+the login URL privately for controlled browser use.
+
+These helpers require the constrained operator/test dependencies, including
+Requests; they are excluded from the code-only Lambda artifact.
+
 ## Bounded cost profile
 
 AWS's Sydney price-list entry for Linux x86 `general1.small` is USD 0.005 per

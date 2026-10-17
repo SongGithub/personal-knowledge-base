@@ -1,17 +1,16 @@
 # Setup and acceptance guide
 
-**Status**: Design-stage guide, 2026-10-17. The cloud service and migration tools
-do not exist yet. Credential commands below become runnable after repairing CLI
-v2 and establishing scoped access; service scenarios describe future acceptance
-procedures, not commands or checks claimed to have passed. See
+**Status**: Updated 2026-10-18. The AWS-native bootstrap, private foundation
+and protected MCP have been deployed; the authenticated mock proof remains incomplete. Migration
+tools and full-feature acceptance scenarios below remain future work. See
 [deployment-access.md](deployment-access.md) for the login alternatives.
 
 The [foundation templates and infrastructure pipeline](../../infra/README.md)
-are authored and validated locally. Routine deployment will use GitHub Actions
-OIDC after a one-time trust bootstrap. Activation currently needs an authorised
-administrator to resolve/confirm the OIDC provider route; see
-[permission-verification.md](permission-verification.md). No cloud stack exists
-as a result of this work.
+include a working AWS-native CodeBuild route. It uses service roles and exact
+source commits without IAM OIDC provider operations. GitHub Actions provides PR
+validation; its OIDC deployment mode remains an alternative requiring an approved
+provider. The native SDK bootstrap does not depend on the broken local AWS CLI.
+See [permission-verification.md](permission-verification.md).
 
 For the current mock goal, see [mock-proof.md](mock-proof.md): local HTTP/Lambda
 checks passed, while the deployed Google-authenticated proof remains incomplete.

@@ -5,7 +5,7 @@
 **Created**: 2026-10-17.  
 **Current authorization**: Prove deployment permissions, deliver infrastructure
 through a pipeline, and prove the MCP end to end with mock Markdown. The foundation
-and first remote read adapter are authored. The full cloud proof remains active
+and protected mock MCP are deployed through CodeBuild. The full cloud proof remains
 and incomplete; local test doubles are not accepted as cloud deployment evidence.
 Unchecked feature/migration tasks are not claimed completed by the mock slice.
 
@@ -23,12 +23,12 @@ and bounded runtime permissions. No public endpoint or model invocation yet.
 - [x] T004 Define usage-based control storage, ingestion queue/DLQ and bounded logs in `infra/foundation.template.json`.
 - [x] T005 Define separate bounded API/ingestion runtime roles in `infra/foundation.template.json` and scoped GitHub/provisioning trust in `infra/bootstrap.template.json`.
 - [x] T006 Validate template parsing and AWS CloudFormation acceptance, recording the exact template digest and limits in `specs/006-cloud-kb-mcp/permission-verification.md`.
-- [ ] T007 Apply the reviewed one-time trust bootstrap, configure GitHub role identifiers/activation, then deploy the approved foundation through `.github/workflows/infra.yml` after cost review.
+- [x] T007 Apply the reviewed one-time trust bootstrap and deploy the approved foundation through the permitted pipeline after cost review. The AWS-native CodeBuild route was used; GitHub OIDC activation remains optional and unconfigured.
 - [x] T008 Establish maintained dependencies and private configuration boundaries for remote adapters in `cloud_kb/config.py` and `requirements-cloud.txt`.
 
-**Activation status**: T007 awaits administrator confirmation of an approved
-GitHub OIDC provider/setup; the current identity is denied provider operations.
-See [permission-verification.md](permission-verification.md).
+**Activation status**: The native bootstrap and CodeBuild-deployed foundation
+exist. IAM OIDC provider operations remain denied and were not needed for this
+delivery route. See [permission-verification.md](permission-verification.md).
 
 ## Phase 3: US1 - Authenticated cross-client retrieval (P1)
 
@@ -83,10 +83,10 @@ full budget and privately rehearse migration/cutover without losing later writes
 - [x] T030 Exercise repeated API Gateway/Lambda invocations and encrypted OAuth-store reconstruction in `tests/test_cloud_lambda.py` and `tests/test_cloud_auth.py`.
 - [x] T031 Build a code-only Lambda release from hashed Linux wheels using `tools/build_cloud_release.py`, verify reproducible ZIP content in `tests/test_cloud_build.py`, and add synthetic checks/build to `.github/workflows/infra.yml`.
 - [x] T032 Provide bounded development-only mock seeding and a deployed OAuth client verifier in `tools/seed_mock_kb.py` and `tools/verify_cloud_mcp.py`; record local evidence and gaps in `specs/006-cloud-kb-mcp/mock-proof.md`.
-- [ ] T033 Resolve approved OIDC/Google configuration, extend reviewed application deployment permissions, deploy through the pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
+- [ ] T033 Configure approved Google identity/client access, deploy through the permitted pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
 
 - [x] T034 Define an AWS-native CodeBuild alternative with exact service trust and source commit in `infra/native-pipeline.template.json`, `infra/buildspec.yml` and `tools/bootstrap_native_pipeline.py`; no IAM identity-provider operation is required.
-- [ ] T035 Apply the approved native bootstrap, run the pinned managed build, inspect actual stack/build/HTTP state and configure the dedicated Google client before completing T033.
+- [x] T035 Apply the approved native bootstrap, run the pinned managed build and verify actual stack/build/HTTP/mock-storage state. Dedicated Google client configuration and authenticated retrieval remain required by T033.
 
 T009–T011 have partial source implementations. Their complete
 Google/live storage/model contracts remain unproven and their markers stay open.
@@ -101,8 +101,8 @@ does not reduce those requirements.
 
 The 2026-10-18 extension includes the gated application deployment job and
 `tools/deploy_cloud_app.py`, with synthetic orchestration tests. T013/T024 denote
-authored, validated template/policy work; they do not claim AWS application
-provisioning, real Google consent or the T033 proof has occurred.
+authored, validated template/policy work. T035 records the actual managed AWS
+provisioning; real Google consent and the T033 proof remain incomplete.
 
 ## Dependencies and incremental delivery
 

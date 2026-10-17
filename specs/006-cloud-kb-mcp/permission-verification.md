@@ -1,9 +1,10 @@
 # AWS permission and infrastructure evidence
 
-**Observed**: 2026-10-17. **Result**: authenticated access and representative
-deployment-policy checks succeeded; GitHub OIDC bootstrap is blocked for the
-current principal. No resources were provisioned. This is preparation evidence,
-not proof of a successful stack or working cloud MCP.
+**Original audit**: 2026-10-17. Authenticated access and representative deployment
+policy checks succeeded, while GitHub OIDC provider operations were denied.
+**2026-10-18 update**: the permitted native CodeBuild route has created the
+bootstrap and foundation. The historical read-only audit below is not the current
+deployment state; see the live execution update at the end and [mock proof](mock-proof.md).
 
 ## Live read-only observations
 
@@ -156,3 +157,54 @@ evidence for a delivery mode that does not perform the denied provider actions;
 it does not change or bypass those controls or prove resource creation succeeds.
 Live Lambda account settings reported 400 total/unreserved concurrency before
 the mock deployment, sufficient for the declared reserved concurrency of 2.
+
+## 2026-10-18 actual native execution
+
+The scoped native bootstrap reached CREATE_COMPLETE. It created the retained API
+anchor, private named auth secret, runtime boundary, separate provisioning/build
+roles, private logs and on-demand CodeBuild project. Its first pinned build
+passed 16 checks and deployed `pkb-dev-foundation` to CREATE_COMPLETE. Actual S3
+metadata confirmed block-public-access, Enabled versioning, AES256 encryption,
+BucketOwnerEnforced ownership and deny-non-TLS policies on all three buckets.
+The actual control table is ACTIVE. No private vault was read or migrated.
+
+The first application attempt failed with an identity-policy denial for stage
+creation's `apigateway:TagResource`, then reached ROLLBACK_COMPLETE. Inventory
+showed only DELETE_COMPLETE Lambda/stage resources. The current native bootstrap
+update applied scoped tagging actions and application-only recovery permissions;
+its corrected managed release is tracked in [mock-proof.md](mock-proof.md).
+
+AWS DescribeType for `AWS::ApiGatewayV2::Stage` declared TagResource in the create
+handler and TagResource/UntagResource in the update handler, matching the live
+failure. The pinned linter's IAM catalogue lacks those actions. The small
+`tools/lint_infra.py` adapter adds exactly those two catalogue entries; W3037 and
+all other lint checks remain active. The regression check rejects misspelled
+actions. Actual deployment is required to establish live handler acceptance.
+
+The corrected [GitHub validation](https://github.com/SongGithub/personal-knowledge-base/actions/runs/39061097832)
+passed 21 runtime/operator checks, two IAM lint checks and Linux packaging.
+GitHub AWS jobs remain skipped: the selected release runner is CodeBuild, using
+its own service role, not the local access key. No OIDC/provider or organisation
+policy change occurred. Google identity and the authenticated mock read remain
+pending owner-approved configuration, so the overall goal is incomplete.
+
+Latest validated template SHA-256 (source revision for managed retry):
+
+```text
+bootstrap.template.json  b9bdb2cf5e8a3ef268d2a198fd422f9167ffe38ea713d7fae204ca04b5adfe61
+native-pipeline.template.json  e243e9eb5dd975cffbde0b25109dd456ae8ea2d1f9918147cd3d6013c5493702
+foundation.template.json  e02acc8320ede726780819ff9e80262045ac843f8d945643e27e3230f88e65b1
+application.template.json  7e0c09a3e62f2ac7bff95dcb1be9637a6d9f688a4fdecb445e57995b1e8f44c1
+```
+
+### Managed release outcome
+
+The corrected native build at `9370906c00d4701dbbb49ed30af28791f91c3b84`
+SUCCEEDED. Bootstrap, foundation and application stacks are respectively
+UPDATE_COMPLETE, CREATE_COMPLETE and CREATE_COMPLETE. Independent probes confirmed
+health 200, anonymous Bearer 401 and invalid-token 401. Actual Lambda CodeSha256
+matches the deterministic release; the versioned mock Markdown matches the fixture,
+and the S3 SQLite checksum matches the synthetic active descriptor. This proves
+actual managed provisioning and the deployed authentication boundary. It does not
+prove Google sign-in or authorised tool reads, which still await owner-approved
+client configuration. No private KB data was migrated.

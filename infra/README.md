@@ -8,11 +8,11 @@ container build or continuously running deployment worker is required.
 
 The current account also supports an [AWS-native CodeBuild delivery mode](NATIVE-PIPELINE.md),
 which needs no external IAM OIDC provider. The scoped native bootstrap/buildspec
-is being prepared for the mock proof; its live deployment status is recorded in
-the mock evidence. The GitHub workflow below remains the credential-free PR
+has deployed the bootstrap, private foundation and protected MCP; live Google proof
+is recorded in [mock evidence](../specs/006-cloud-kb-mcp/mock-proof.md). The GitHub workflow below remains the credential-free PR
 validation path and an optional OIDC deployment path for an approved provider.
 
-`.github/workflows/infra.yml` is the deployment path:
+`.github/workflows/infra.yml` provides the alternative GitHub deployment path:
 
 1. Pull requests validate all templates with pinned `cfn-lint`, without AWS
    credentials or an OIDC token. Forked code cannot deploy.
@@ -40,6 +40,7 @@ separate reviewed trust/approval policy, not just an input that changes the name
 | File | Purpose |
 |---|---|
 | `bootstrap.template.json` | OIDC provider/reuse, deployment/provisioning roles, runtime boundary and retained HTTP API identity anchor |
+| `native-pipeline.template.json`, `buildspec.yml` | Selected on-demand CodeBuild pipeline with service trust, exact source commit and the same bounded runtime/provisioning scope |
 | `foundation.template.json` | Private KB/index/release storage, control records, ingestion queues, log groups and runtime roles |
 | `application.template.json` | Google-protected read-only Lambda and routes/integration/stage on the anchored HTTP API |
 | `requirements.txt` | Pinned infrastructure validator used in local/PR checks |
@@ -225,19 +226,19 @@ The later [mock proof](../specs/006-cloud-kb-mcp/mock-proof.md) adds a stateless
 HTTP adapter, Google broker/durable encrypted store, synthetic note, local
 verification and Linux release builder. The workflow checks/builds that slice
 without credentials and includes a separately gated application deployment job.
-The scope extension is authored, not applied to AWS. The real cloud/Google proof
-has not passed. This does not activate an unauthenticated fallback.
+The native bootstrap scope is applied to AWS; the real Google-authenticated
+proof has not passed. This does not activate an unauthenticated fallback.
 
 Templates are checked with AWS `ValidateTemplate` and local pinned lint. The
 dated evidence identifies validated versions; local checks use:
 
 ```sh
 python3 -m pip install -r infra/requirements.txt
-cfn-lint --non-zero-exit-code warning --regions ap-southeast-2 \
-  --template infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json
+python3 tools/lint_infra.py infra/foundation.template.json \
+  infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
 ```
 
 See [permission evidence](../specs/006-cloud-kb-mcp/permission-verification.md) for
 scope and limitations. Template validation does not prove all resource handlers,
-quotas, OIDC federation or the eventual pipeline deployment work. No change set
-has been executed and no KB content has been uploaded.
+quotas, OIDC federation or the eventual authenticated application behavior. Live
+deployment and synthetic data evidence are tracked separately in the mock proof.
