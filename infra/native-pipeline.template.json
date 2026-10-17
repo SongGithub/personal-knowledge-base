@@ -457,7 +457,9 @@
                     "apigateway:POST",
                     "apigateway:PUT",
                     "apigateway:PATCH",
-                    "apigateway:DELETE"
+                    "apigateway:DELETE",
+                    "apigateway:TagResource",
+                    "apigateway:UntagResource"
                   ],
                   "Resource": [
                     {
@@ -712,6 +714,32 @@
                   ],
                   "Resource": {
                     "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-${Environment}-pipeline:*"
+                  }
+                },
+                {
+                  "Sid": "InspectFailedApplication",
+                  "Effect": "Allow",
+                  "Action": "cloudformation:ListStackResources",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-application/*"
+                  }
+                },
+                {
+                  "Sid": "RecoverFailedApplicationWithProvisioningRole",
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DeleteStack",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-application/*"
+                  },
+                  "Condition": {
+                    "ArnEquals": {
+                      "cloudformation:RoleArn": {
+                        "Fn::GetAtt": [
+                          "CloudFormationExecutionRole",
+                          "Arn"
+                        ]
+                      }
+                    }
                   }
                 }
               ]

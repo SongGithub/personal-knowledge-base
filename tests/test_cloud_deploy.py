@@ -8,10 +8,27 @@ from urllib.error import HTTPError
 
 from botocore.exceptions import ClientError
 
-from tools.deploy_cloud_app import Deployment, deploy, upload_release
+from tools.deploy_cloud_app import Deployment, deploy, upload_release, recover_empty_application
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_failed_application_retry_only_deletes_empty_application_metadata(self):
+        cfn = Mock()
+        cfn.get_paginator.return_value.paginate.return_value = [{"StackResourceSummaries": [
+            {"ResourceType": "AWS::Lambda::Function", "ResourceStatus": "DELETE_COMPLETE"}]}]
+        recover_empty_application(cfn, "scoped-role")
+        cfn.delete_stack.assert_called_once_with(StackName="pkb-dev-application", RoleARN="scoped-role")
+
+    def test_failed_application_recovery_refuses_live_or_data_resources(self):
+        for kind, status in [("AWS::Lambda::Function", "CREATE_COMPLETE"),
+                             ("AWS::S3::Bucket", "DELETE_COMPLETE")]:
+            cfn = Mock()
+            cfn.get_paginator.return_value.paginate.return_value = [{"StackResourceSummaries": [
+                {"ResourceType": kind, "ResourceStatus": status}]}]
+            with self.assertRaisesRegex(RuntimeError, "automatic recovery refused"):
+                recover_empty_application(cfn, "scoped-role")
+            cfn.delete_stack.assert_not_called()
+
     def test_upload_replay_requires_matching_versioned_artifact(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "synthetic.zip"

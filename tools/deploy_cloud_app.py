@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy the reviewed development MCP application from trusted CI using OIDC.
+"""Deploy the reviewed development MCP application from the trusted deployment pipeline.
 
 AWS SDK configuration supplies credentials. No .env/key handling, IAM bootstrap,
 Google credentials, owner-grant creation or private KB migration occurs here.
@@ -74,6 +74,19 @@ def upload_release(s3, bucket, path):
     return key, version, digest
 
 
+def recover_empty_application(cfn, execution_role):
+    """Remove only rolled-back, empty application metadata so CREATE can retry."""
+    stack = "pkb-dev-application"
+    allowed = {"AWS::Lambda::Function", "AWS::Lambda::Permission",
+               "AWS::ApiGatewayV2::Integration", "AWS::ApiGatewayV2::Route", "AWS::ApiGatewayV2::Stage"}
+    for page in cfn.get_paginator("list_stack_resources").paginate(StackName=stack):
+        for resource in page["StackResourceSummaries"]:
+            if resource["ResourceType"] not in allowed or resource["ResourceStatus"] != "DELETE_COMPLETE":
+                raise RuntimeError("Failed application still owns resources; automatic recovery refused")
+    cfn.delete_stack(StackName=stack, RoleARN=execution_role)
+    cfn.get_waiter("stack_delete_complete").wait(StackName=stack, WaiterConfig={"Delay": 3, "MaxAttempts": 100})
+
+
 def deploy(session, configuration, release):
     cfn, s3 = session.client("cloudformation"), session.client("s3")
     trust = outputs(cfn, "pkb-dev-bootstrap")
@@ -97,7 +110,10 @@ def deploy(session, configuration, release):
     stack = "pkb-dev-application"
     kind = "UPDATE"
     try:
-        cfn.describe_stacks(StackName=stack)
+        existing = cfn.describe_stacks(StackName=stack)["Stacks"][0]
+        if existing["StackStatus"] == "ROLLBACK_COMPLETE":
+            recover_empty_application(cfn, configuration.execution_role)
+            kind = "CREATE"
     except ClientError as error:
         if error.response["Error"]["Code"] != "ValidationError" or "does not exist" not in error.response["Error"].get("Message", ""):
             raise
