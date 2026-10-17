@@ -103,7 +103,7 @@ Lint identified an invalid S3 IAM action during preparation. It was corrected
 before the successful lint/AWS validation recorded here. Local workflow checks
 do not prove GitHub has loaded or executed the workflow.
 
-## Execution status
+## Execution status at the original audit
 
 The [infrastructure guide](../../infra/README.md) describes a one-time
 CloudFormation trust bootstrap followed by GitHub Actions OIDC deployment. The
@@ -141,4 +141,7 @@ Declared resource counts are 5, 13 and 5 respectively. These later hashes
 supersede the original two-template authoring evidence above. AWS accepted the
 templates without creating a change set or resource. Eleven local synthetic
 checks and a hashed Linux release build are recorded in [mock-proof.md](mock-proof.md).
-The additional application workflow job is separately gated and remains unrun.
+The additional application deployment job is separately gated and remains unrun.
+The credential-free [PR validation run](https://github.com/SongGithub/personal-knowledge-base/actions/runs/39057931922)
+passed on GitHub's Linux runner; both AWS deployment jobs skipped. Publishing
+the draft PR did not apply the bootstrap, activate deployment or upload KB data.

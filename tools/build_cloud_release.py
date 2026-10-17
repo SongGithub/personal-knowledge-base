@@ -36,6 +36,11 @@ def build(output: Path):
                 relative = path.relative_to(stage)
                 if "__pycache__" in relative.parts or relative.parts[0] == "bin" or path.suffix == ".pyc":
                     continue
+                # pip rewrites RECORD hashes for generated launchers with the
+                # build interpreter path. Launchers are excluded; omit their
+                # install-specific ledger as well so code ZIPs are reproducible.
+                if path.name == "RECORD" and any(part.endswith(".dist-info") for part in relative.parts[:-1]):
+                    continue
                 if path.is_symlink():
                     raise ValueError("Release staging contains a symlink")
                 if not path.is_file():

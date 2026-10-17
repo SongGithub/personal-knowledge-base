@@ -81,7 +81,7 @@ full budget and privately rehearse migration/cutover without losing later writes
 
 - [x] T029 Add the bilingual fixture and real loopback MCP search/fetch/access-failure checks in `tests/test_cloud_http.py` and `tests/fixtures/cloud-kb/`.
 - [x] T030 Exercise repeated API Gateway/Lambda invocations and encrypted OAuth-store reconstruction in `tests/test_cloud_lambda.py` and `tests/test_cloud_auth.py`.
-- [x] T031 Build a code-only Lambda release from hashed Linux wheels using `tools/build_cloud_release.py` and add the synthetic checks/build to `.github/workflows/infra.yml`.
+- [x] T031 Build a code-only Lambda release from hashed Linux wheels using `tools/build_cloud_release.py`, verify reproducible ZIP content in `tests/test_cloud_build.py`, and add synthetic checks/build to `.github/workflows/infra.yml`.
 - [x] T032 Provide bounded development-only mock seeding and a deployed OAuth client verifier in `tools/seed_mock_kb.py` and `tools/verify_cloud_mcp.py`; record local evidence and gaps in `specs/006-cloud-kb-mcp/mock-proof.md`.
 - [ ] T033 Resolve approved OIDC/Google configuration, extend reviewed application deployment permissions, deploy through the pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
 
