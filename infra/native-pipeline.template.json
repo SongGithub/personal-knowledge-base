@@ -1,0 +1,889 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "pkb",
+      "MinLength": 2,
+      "MaxLength": 16,
+      "AllowedPattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "AllowedValues": [
+        "pkb"
+      ]
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": [
+        "dev"
+      ]
+    },
+    "ApprovedEmbeddingModelArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^arn:[a-z0-9-]+:bedrock:[a-z0-9-]+::foundation-model/[a-zA-Z0-9._:-]+$"
+    },
+    "EnableMockSeeding": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "true",
+        "false"
+      ]
+    },
+    "SourceCommit": {
+      "Type": "String",
+      "AllowedPattern": "^[0-9a-f]{40}$",
+      "Description": "Explicitly approved public source commit. No PR webhook or automatic branch deployment."
+    },
+    "AuthSecretJson": {
+      "Type": "String",
+      "NoEcho": true,
+      "Description": "Private initial auth JSON, generated locally. Use disabled/pending Google values until the owner configures a dedicated client."
+    },
+    "OwnerGoogleSubject": {
+      "Type": "String",
+      "NoEcho": true,
+      "Default": "PENDING_GOOGLE_OWNER"
+    },
+    "ClientRedirectUris": {
+      "Type": "String",
+      "NoEcho": true,
+      "Default": "[\"http://localhost:8765/callback\"]"
+    }
+  },
+  "Conditions": {
+    "HasApprovedModel": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "ApprovedEmbeddingModelArn"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "AllowMockSeeding": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "EnableMockSeeding"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "Environment"
+            },
+            "dev"
+          ]
+        }
+      ]
+    }
+  },
+  "Description": "AWS-native on-demand KB deployment pipeline, scoped roles, private auth secret and API identity. No external IAM identity provider.",
+  "Resources": {
+    "RuntimePermissionsBoundary": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ManagedPolicyName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-runtime-boundary"
+        },
+        "Description": "Maximum permissions for KB runtime roles; no infrastructure, IAM, release-bucket or role-assumption authority.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:PutObject"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/attachments/*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:ConditionCheckItem"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-${Environment}-control"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueAttributes"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${Environment}-api:*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${Environment}-ingestion:*"
+                }
+              ]
+            },
+            {
+              "Fn::If": [
+                "HasApprovedModel",
+                {
+                  "Effect": "Allow",
+                  "Action": "bedrock:InvokeModel",
+                  "Resource": {
+                    "Ref": "ApprovedEmbeddingModelArn"
+                  }
+                },
+                {
+                  "Ref": "AWS::NoValue"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": "secretsmanager:GetSecretValue",
+              "Resource": {
+                "Ref": "AuthSecretArn"
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:PrincipalArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "CloudFormationExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-cfn-execution"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudformation.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ProvisionKbFoundation",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ProjectBuckets",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:CreateBucket",
+                    "s3:DeleteBucket",
+                    "s3:GetBucketLocation",
+                    "s3:ListBucket",
+                    "s3:GetBucketPolicy",
+                    "s3:PutBucketPolicy",
+                    "s3:DeleteBucketPolicy",
+                    "s3:GetBucketPublicAccessBlock",
+                    "s3:PutBucketPublicAccessBlock",
+                    "s3:GetBucketVersioning",
+                    "s3:PutBucketVersioning",
+                    "s3:GetEncryptionConfiguration",
+                    "s3:PutEncryptionConfiguration",
+                    "s3:GetBucketOwnershipControls",
+                    "s3:PutBucketOwnershipControls",
+                    "s3:GetLifecycleConfiguration",
+                    "s3:PutLifecycleConfiguration",
+                    "s3:GetBucketTagging",
+                    "s3:PutBucketTagging"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-releases-${AWS::AccountId}-${AWS::Region}"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "ProjectControlTable",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:CreateTable",
+                    "dynamodb:UpdateTable",
+                    "dynamodb:DeleteTable",
+                    "dynamodb:DescribeTable",
+                    "dynamodb:UpdateContinuousBackups",
+                    "dynamodb:DescribeContinuousBackups",
+                    "dynamodb:UpdateTimeToLive",
+                    "dynamodb:DescribeTimeToLive",
+                    "dynamodb:TagResource",
+                    "dynamodb:UntagResource",
+                    "dynamodb:ListTagsOfResource"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-${Environment}-control"
+                  }
+                },
+                {
+                  "Sid": "ProjectQueues",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:CreateQueue",
+                    "sqs:DeleteQueue",
+                    "sqs:GetQueueUrl",
+                    "sqs:GetQueueAttributes",
+                    "sqs:SetQueueAttributes",
+                    "sqs:TagQueue",
+                    "sqs:UntagQueue",
+                    "sqs:ListQueueTags"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion-dlq"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "ProjectLogGroups",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:DeleteLogGroup",
+                    "logs:PutRetentionPolicy",
+                    "logs:DeleteRetentionPolicy",
+                    "logs:TagResource",
+                    "logs:UntagResource",
+                    "logs:ListTagsForResource",
+                    "logs:TagLogGroup",
+                    "logs:UntagLogGroup",
+                    "logs:ListTagsLogGroup"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${Environment}-api*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${Environment}-ingestion*"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "RegionalLogMetadata",
+                  "Effect": "Allow",
+                  "Action": "logs:DescribeLogGroups",
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:RequestedRegion": {
+                        "Ref": "AWS::Region"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "CreateOnlyBoundedRuntimeRoles",
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:CreateRole",
+                    "iam:PutRolePermissionsBoundary"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-ingestion"
+                    }
+                  ],
+                  "Condition": {
+                    "ArnEquals": {
+                      "iam:PermissionsBoundary": {
+                        "Ref": "RuntimePermissionsBoundary"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "ManageOnlyRuntimeRolePolicies",
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:GetRole",
+                    "iam:UpdateRole",
+                    "iam:UpdateRoleDescription",
+                    "iam:UpdateAssumeRolePolicy",
+                    "iam:DeleteRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:GetRolePolicy",
+                    "iam:ListRolePolicies",
+                    "iam:ListAttachedRolePolicies",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                    "iam:ListRoleTags"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-ingestion"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "CodeReleaseRead",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-releases-${AWS::AccountId}-${AWS::Region}/releases/*"
+                  }
+                },
+                {
+                  "Sid": "ManageOnlyApiFunction",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:CreateFunction",
+                    "lambda:GetFunction",
+                    "lambda:GetFunctionConfiguration",
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateFunctionConfiguration",
+                    "lambda:DeleteFunction",
+                    "lambda:AddPermission",
+                    "lambda:RemovePermission",
+                    "lambda:GetPolicy",
+                    "lambda:PutFunctionConcurrency",
+                    "lambda:DeleteFunctionConcurrency",
+                    "lambda:GetFunctionConcurrency",
+                    "lambda:TagResource",
+                    "lambda:UntagResource",
+                    "lambda:ListTags"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${Environment}-api"
+                  }
+                },
+                {
+                  "Sid": "PassOnlyApiRuntime",
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "iam:PassedToService": "lambda.amazonaws.com"
+                    }
+                  }
+                },
+                {
+                  "Sid": "ManageOnlyAnchoredHttpApi",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET",
+                    "apigateway:POST",
+                    "apigateway:PUT",
+                    "apigateway:PATCH",
+                    "apigateway:DELETE"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "HttpApiAnchor": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-${Environment}-mcp"
+        },
+        "ProtocolType": "HTTP",
+        "Tags": {
+          "Project": {
+            "Ref": "ProjectName"
+          },
+          "Environment": {
+            "Ref": "Environment"
+          }
+        }
+      }
+    },
+    "AuthSecretArn": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-${Environment}-auth"
+        },
+        "Description": "Private Google OAuth and durable signing/encryption configuration; pending values deny knowledge access.",
+        "SecretString": {
+          "Ref": "AuthSecretJson"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          }
+        ]
+      }
+    },
+    "NativeBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-native-build"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/${ProjectName}-${Environment}-pipeline"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DeployOnlyKbStacks",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "PlanOnlyWithProvisioningRole",
+                  "Effect": "Allow",
+                  "Action": "cloudformation:CreateChangeSet",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-foundation/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-application/*"
+                    }
+                  ],
+                  "Condition": {
+                    "ArnEquals": {
+                      "cloudformation:RoleArn": {
+                        "Fn::GetAtt": [
+                          "CloudFormationExecutionRole",
+                          "Arn"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "OperateOnlyKbStacks",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:ExecuteChangeSet",
+                    "cloudformation:DeleteChangeSet",
+                    "cloudformation:DescribeChangeSet",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DescribeStackEvents",
+                    "cloudformation:GetTemplateSummary",
+                    "cloudformation:ListChangeSets",
+                    "cloudformation:TagResource",
+                    "cloudformation:UntagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-foundation/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-application/*"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "TemplateValidation",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:ValidateTemplate",
+                    "cloudformation:GetTemplateSummary"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "PassOnlyProvisioningRole",
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "CloudFormationExecutionRole",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "iam:PassedToService": "cloudformation.amazonaws.com"
+                    }
+                  }
+                },
+                {
+                  "Sid": "UploadOnlyCodeReleases",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-releases-${AWS::AccountId}-${AWS::Region}/releases/*"
+                  }
+                },
+                {
+                  "Fn::If": [
+                    "AllowMockSeeding",
+                    {
+                      "Sid": "SeedOnlyMockObjects",
+                      "Effect": "Allow",
+                      "Action": [
+                        "s3:PutObject",
+                        "s3:GetObject"
+                      ],
+                      "Resource": [
+                        {
+                          "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Resources/MCP Demo/Mock orchard.md"
+                        },
+                        {
+                          "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/mock/*"
+                        }
+                      ]
+                    },
+                    {
+                      "Ref": "AWS::NoValue"
+                    }
+                  ]
+                },
+                {
+                  "Fn::If": [
+                    "AllowMockSeeding",
+                    {
+                      "Sid": "SeedOnlyMockPointer",
+                      "Effect": "Allow",
+                      "Action": [
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem"
+                      ],
+                      "Resource": {
+                        "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-${Environment}-control"
+                      },
+                      "Condition": {
+                        "ForAllValues:StringEquals": {
+                          "dynamodb:LeadingKeys": [
+                            "INDEX#ACTIVE"
+                          ]
+                        },
+                        "Null": {
+                          "dynamodb:LeadingKeys": "false"
+                        }
+                      }
+                    },
+                    {
+                      "Ref": "AWS::NoValue"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "ReadOnlyBootstrapIdentifiers",
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DescribeStacks",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-${Environment}-bootstrap/*"
+                  }
+                },
+                {
+                  "Sid": "PrivateBuildLogs",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-${Environment}-pipeline:*"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BuildLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${ProjectName}-${Environment}-pipeline"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "NativePipeline": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-${Environment}-pipeline"
+        },
+        "ServiceRole": {
+          "Fn::GetAtt": [
+            "NativeBuildRole",
+            "Arn"
+          ]
+        },
+        "Artifacts": {
+          "Type": "NO_ARTIFACTS"
+        },
+        "Source": {
+          "Type": "GITHUB",
+          "Location": "https://github.com/SongGithub/personal-knowledge-base.git",
+          "GitCloneDepth": 1,
+          "ReportBuildStatus": false,
+          "BuildSpec": "infra/buildspec.yml"
+        },
+        "SourceVersion": {
+          "Ref": "SourceCommit"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:8.0",
+          "ImagePullCredentialsType": "CODEBUILD",
+          "PrivilegedMode": false,
+          "EnvironmentVariables": [
+            {
+              "Name": "CFN_EXECUTION_ROLE_ARN",
+              "Value": {
+                "Fn::GetAtt": [
+                  "CloudFormationExecutionRole",
+                  "Arn"
+                ]
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "RUNTIME_BOUNDARY_ARN",
+              "Value": {
+                "Ref": "RuntimePermissionsBoundary"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "AUTH_SECRET_ARN",
+              "Value": {
+                "Ref": "AuthSecretArn"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "GOOGLE_OWNER_SUB",
+              "Value": {
+                "Ref": "OwnerGoogleSubject"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "CLIENT_REDIRECT_URIS",
+              "Value": {
+                "Ref": "ClientRedirectUris"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "MCP_SEED_MOCK",
+              "Value": {
+                "Fn::If": [
+                  "AllowMockSeeding",
+                  "true",
+                  "false"
+                ]
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "FASTMCP_LOG_LEVEL",
+              "Value": "ERROR",
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "AWS_REGION",
+              "Value": {
+                "Ref": "AWS::Region"
+              },
+              "Type": "PLAINTEXT"
+            }
+          ]
+        },
+        "ConcurrentBuildLimit": 1,
+        "TimeoutInMinutes": 15,
+        "QueuedTimeoutInMinutes": 10,
+        "Cache": {
+          "Type": "NO_CACHE"
+        },
+        "LogsConfig": {
+          "CloudWatchLogs": {
+            "Status": "ENABLED",
+            "GroupName": {
+              "Ref": "BuildLogGroup"
+            },
+            "StreamName": "pipeline"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "CloudFormationExecutionRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "CloudFormationExecutionRole",
+          "Arn"
+        ]
+      }
+    },
+    "RuntimePermissionsBoundaryArn": {
+      "Value": {
+        "Ref": "RuntimePermissionsBoundary"
+      }
+    },
+    "HttpApiId": {
+      "Value": {
+        "Ref": "HttpApiAnchor"
+      }
+    },
+    "HttpApiEndpoint": {
+      "Value": {
+        "Fn::GetAtt": [
+          "HttpApiAnchor",
+          "ApiEndpoint"
+        ]
+      }
+    },
+    "AuthSecretArn": {
+      "Value": {
+        "Ref": "AuthSecretArn"
+      }
+    },
+    "NativePipelineName": {
+      "Value": {
+        "Ref": "NativePipeline"
+      }
+    },
+    "NativeBuildRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "NativeBuildRole",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

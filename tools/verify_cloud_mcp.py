@@ -13,6 +13,7 @@ import time
 from urllib.parse import urlsplit
 
 from fastmcp import Client
+from fastmcp.client.auth import OAuth
 import httpx2
 
 
@@ -32,7 +33,8 @@ async def verify(url):
         if response.status_code not in (401, 403):
             raise RuntimeError("Unauthenticated MCP access was not rejected")
     started = time.monotonic()
-    async with Client(url, auth="oauth", timeout=30) as client:
+    auth = OAuth(mcp_url=url, callback_port=8765, callback_host="localhost", client_name="KB mock proof")
+    async with Client(url, auth=auth, timeout=30) as client:
         names = {tool.name for tool in await client.list_tools()}
         if not {"search_kb", "fetch_note"} <= names:
             raise RuntimeError("Required MCP tools are missing")

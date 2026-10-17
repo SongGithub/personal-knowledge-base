@@ -145,3 +145,14 @@ The additional application deployment job is separately gated and remains unrun.
 The credential-free [PR validation run](https://github.com/SongGithub/personal-knowledge-base/actions/runs/39057931922)
 passed on GitHub's Linux runner; both AWS deployment jobs skipped. Publishing
 the draft PR did not apply the bootstrap, activate deployment or upload KB data.
+
+### Native route checks
+
+The current IAM principal's regional simulations also allowed CodeBuild
+CreateProject, UpdateProject, StartBuild, BatchGetBuilds, BatchGetProjects,
+StopBuild and DeleteProject, plus named Secrets Manager create/put/get/describe
+operations. All returned `AllowedByOrganizations=true`. This is permission
+evidence for a delivery mode that does not perform the denied provider actions;
+it does not change or bypass those controls or prove resource creation succeeds.
+Live Lambda account settings reported 400 total/unreserved concurrency before
+the mock deployment, sufficient for the declared reserved concurrency of 2.

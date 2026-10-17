@@ -71,6 +71,14 @@ Google sign-in or private storage integration.
 
 ## Remaining deployment work
 
+**2026-10-18 route update**: read-only IAM simulations allowed CodeBuild
+create/update/start/read operations and the required named-secret operations.
+The Lambda account limit is 400 concurrent executions, supporting the planned
+reserved 2. The [native pipeline](../../infra/NATIVE-PIPELINE.md) provides an
+authorised service-based delivery route without IAM OIDC provider operations.
+Its bootstrap/build outcome has not yet been observed. It retains the same
+Google and actual S3/search/fetch completion gate.
+
 1. Resolve the organisation-controlled GitHub OIDC provider route through an
    authorised administrator. Read-only revalidation still returned AccessDenied
    for provider listing. See [permission-verification.md](permission-verification.md).

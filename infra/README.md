@@ -6,6 +6,12 @@ container build or continuously running deployment worker is required.
 
 ## Delivery pipeline
 
+The current account also supports an [AWS-native CodeBuild delivery mode](NATIVE-PIPELINE.md),
+which needs no external IAM OIDC provider. The scoped native bootstrap/buildspec
+is being prepared for the mock proof; its live deployment status is recorded in
+the mock evidence. The GitHub workflow below remains the credential-free PR
+validation path and an optional OIDC deployment path for an approved provider.
+
 `.github/workflows/infra.yml` is the deployment path:
 
 1. Pull requests validate all templates with pinned `cfn-lint`, without AWS

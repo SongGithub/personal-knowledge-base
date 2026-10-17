@@ -85,11 +85,19 @@ full budget and privately rehearse migration/cutover without losing later writes
 - [x] T032 Provide bounded development-only mock seeding and a deployed OAuth client verifier in `tools/seed_mock_kb.py` and `tools/verify_cloud_mcp.py`; record local evidence and gaps in `specs/006-cloud-kb-mcp/mock-proof.md`.
 - [ ] T033 Resolve approved OIDC/Google configuration, extend reviewed application deployment permissions, deploy through the pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
 
+- [x] T034 Define an AWS-native CodeBuild alternative with exact service trust and source commit in `infra/native-pipeline.template.json`, `infra/buildspec.yml` and `tools/bootstrap_native_pipeline.py`; no IAM identity-provider operation is required.
+- [ ] T035 Apply the approved native bootstrap, run the pinned managed build, inspect actual stack/build/HTTP state and configure the dedicated Google client before completing T033.
+
 T009–T011 have partial source implementations. Their complete
 Google/live storage/model contracts remain unproven and their markers stay open.
 T033 is the completion gate for the current goal; passing T029–T032 alone does
 not satisfy it. T024 supplies its application provisioning scope; T007 supplies
 the one-time trust bootstrap and foundation.
+
+The current native route may satisfy T007/T033 without GitHub OIDC when the
+organisation permits CodeBuild instead. It must still satisfy the full Google,
+actual storage and authenticated read proof; replacing the deployment runner
+does not reduce those requirements.
 
 The 2026-10-18 extension includes the gated application deployment job and
 `tools/deploy_cloud_app.py`, with synthetic orchestration tests. T013/T024 denote
