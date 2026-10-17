@@ -13,6 +13,8 @@ on:
       - 'tools/verify_cloud_mcp.py'
       - 'tools/seed_mock_kb.py'
       - 'tools/deploy_cloud_app.py'
+      - 'tools/aws_session.py'
+      - 'tools/bootstrap_native_pipeline.py'
   push:
     branches: [main]
     paths:
@@ -26,6 +28,8 @@ on:
       - 'tools/verify_cloud_mcp.py'
       - 'tools/seed_mock_kb.py'
       - 'tools/deploy_cloud_app.py'
+      - 'tools/aws_session.py'
+      - 'tools/bootstrap_native_pipeline.py'
   workflow_dispatch:
 
 permissions:
