@@ -45,7 +45,9 @@ class InfraLintTests(unittest.TestCase):
             })
 
     def test_ordinary_updates_require_if_match_and_history_is_prefix_scoped(self):
-        from cloud_kb.storage import UPDATE_ROOTS
+        # This job intentionally installs only infrastructure validators, not
+        # the application SDK. Use the approved folder contract as the oracle.
+        update_roots = ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/")
         root = Path(__file__).parents[1]
         templates = [json.loads((root / "infra" / name).read_text()) for name in (
             "foundation.template.json", "bootstrap.template.json", "native-pipeline.template.json")]
@@ -56,10 +58,10 @@ class InfraLintTests(unittest.TestCase):
             update = next(row for row in statements if row.get("Sid") == sid)
             self.assertEqual(update["Condition"], {"Null": {"s3:if-match": "false"}})
             paths = {row["Fn::Sub"].split("/notes/", 1)[1] for row in update["Resource"]}
-            self.assertEqual(paths, {prefix + "*" for prefix in UPDATE_ROOTS})
+            self.assertEqual(paths, {prefix + "*" for prefix in update_roots})
             history = next(row for row in statements if row.get("Action") == "s3:ListBucketVersions")
             self.assertEqual(set(history["Condition"]["StringLike"]["s3:prefix"]),
-                             {"notes/" + prefix + "*" for prefix in UPDATE_ROOTS})
+                             {"notes/" + prefix + "*" for prefix in update_roots})
 
     def test_custom_domain_create_uses_supported_scoped_conditions(self):
         root = Path(__file__).parents[1]
