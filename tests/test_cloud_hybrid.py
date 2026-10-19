@@ -106,6 +106,14 @@ class HybridTests(unittest.TestCase):
         self.assertEqual(rank_hybrid(["a", "b", "c", "d"], ["d", "c", "b", "a"],
                                      {path: "ordinary" for path in "abcd"}).index("d") < 3, True)
 
+    def test_hybrid_preserves_semantic_shortlist_and_exact_identifier_lookup(self):
+        tiers = {path: "ordinary" for path in ("lexical", "semantic-1", "semantic-2", "semantic-3", "related")}
+        ranked = rank_hybrid(["lexical", "related"], ["semantic-1", "semantic-2", "semantic-3", "related"], tiers)
+        self.assertEqual(ranked[:3], ["semantic-1", "semantic-2", "semantic-3"])
+
+        ranked = rank_hybrid(["lexical", "related"], ["related", "lexical"], tiers, "MAPLE-AUTH-64")
+        self.assertEqual(ranked[0], "lexical")
+
     def test_reconcile_reuses_vectors_and_searches_all_strategies(self):
         s3, table, embeddings = FakeS3(), FakeTable(), FakeEmbeddings()
         path = "Projects/Train.md"
