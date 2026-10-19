@@ -1062,7 +1062,7 @@
             {
               "Fn::If": [
                 "HasCloudflareDnsToken",
-                {"Name": "MCP_CLOUDFLARE_DNS_TOKEN", "Value": {"Ref": "CloudflareDnsTokenSecretArn"}, "Type": "SECRETS_MANAGER"},
+                {"Name": "MCP_CLOUDFLARE_DNS_TOKEN", "Value": {"Fn::Sub": "${CloudflareDnsTokenSecretArn}:CLOUDFLARE_API_TOKEN_DNS"}, "Type": "SECRETS_MANAGER"},
                 {"Ref": "AWS::NoValue"}
               ]
             },

@@ -28,7 +28,9 @@ and [API Gateway certificate requirements](https://docs.aws.amazon.com/apigatewa
    secrets are not readable by CodeBuild. Store a copy in AWS Secrets Manager
    in `ap-southeast-2`, for example `pkb/dev/cloudflare-dns`, using
    `python3 tools/store_cloudflare_dns_token.py`; then pass its ARN through
-   `--cloudflare-dns-token-secret-arn`. CodeBuild receives
+   `--cloudflare-dns-token-secret-arn`. Store the value as the JSON key
+   `CLOUDFLARE_API_TOKEN_DNS`; the CodeBuild environment selects that key.
+   CodeBuild receives
    `secretsmanager:GetSecretValue` on that exact ARN. The token itself is never
    a CloudFormation parameter.
 3. Add `https://mcp.midu.com.au/auth/callback` to the Google OAuth web client's

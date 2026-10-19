@@ -38,6 +38,8 @@ class NativePipelineTests(unittest.TestCase):
         self.assertEqual(variables["PKB_REQUIRE_DEFAULT_WINNER"], {"Ref": "RequireDefaultWinner"})
         cloudflare_env = next(item for item in project["Environment"]["EnvironmentVariables"] if "Fn::If" in item)
         self.assertEqual(cloudflare_env["Fn::If"][1]["Name"], "MCP_CLOUDFLARE_DNS_TOKEN")
+        self.assertEqual(cloudflare_env["Fn::If"][1]["Value"],
+                         {"Fn::Sub": "${CloudflareDnsTokenSecretArn}:CLOUDFLARE_API_TOKEN_DNS"})
         buildspec = Path("infra/buildspec.yml").read_text()
         self.assertIn('"${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true"', buildspec)
         self.assertIn("tools/benchmark_cloud_embeddings.py --require-default-best", buildspec)
