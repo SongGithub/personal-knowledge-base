@@ -52,7 +52,23 @@ class SyntheticNotes:
                 "tier": authority(path, content), "sha256": hashlib.sha256(content.encode()).hexdigest()}
 
 
+class CachedQueryEmbeddings:
+    """Reuse one query vector so strategy comparisons rank identical inputs."""
+    def __init__(self, embeddings):
+        self.embeddings = embeddings
+        self.queries = {}
+
+    def documents(self, texts):
+        return self.embeddings.documents(texts)
+
+    def query(self, text):
+        if text not in self.queries:
+            self.queries[text] = self.embeddings.query(text)
+        return self.queries[text]
+
+
 def benchmark(embeddings, fixture):
+    embeddings = CachedQueryEmbeddings(embeddings)
     notes = {item["path"]: item["text"] for item in fixture["notes"]}
     with closing(sqlite3.connect(":memory:")) as db:
         db.execute("CREATE TABLE notes(path TEXT PRIMARY KEY,tier TEXT,sha256 TEXT,source_revision TEXT)")

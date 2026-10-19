@@ -183,10 +183,14 @@ settings, exercise rollback/restore and confirm restricted deployment permission
   a recorded data boundary. Model replacement MUST compare bilingual retrieval
   quality and use compatible document/query embeddings.
 - **FR-013a**: Cloud `search_kb` MUST accept `lexical`, `vector`, and `hybrid`,
-  default to `hybrid`, and preserve the local tokenizer/chunker, lexical scoring,
-  reciprocal-rank fusion weights and near-tie authority rule unless a measured
-  bilingual comparison justifies a documented change. The initial cloud index
-  MUST cover the migrated S3 Markdown corpus before production parity is claimed.
+  default to `hybrid`, and preserve the local tokenizer/chunker and lexical
+  scoring. Hybrid ranking MUST keep the top three semantic candidates ahead of
+  fused fallback candidates for ordinary natural-language queries, and MUST
+  use lexical ranking first when the query contains an explicit note identifier.
+  Reciprocal-rank fusion and the near-tie authority rule order the remaining
+  candidates. This measured adjustment is recorded in `model-decision.md`. The
+  initial cloud index MUST cover the migrated S3 Markdown corpus before
+  production parity is claimed.
   Query embedding runs during semantic MCP searches; document embedding runs
   during independent initial/incremental ingestion. Index and query must pin the
   same embedding contract. A changed model requires a separate full re-embedding.

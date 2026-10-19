@@ -17,6 +17,7 @@ DEFAULT_STRATEGY = "hybrid"
 MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
 STOP = set("a an and are as at be did do for from how i in is it my of on or the to was were what when why with 的 了 吗 我 是 在 有 和".split())
 AUTHORITY = {"canonical": 0, "verified": 1, "ordinary": 2, "archive": 3, "unverified": 4}
+EXPLICIT_IDENTIFIER = re.compile(r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]+\b", re.IGNORECASE)
 
 
 def tokens(text):
@@ -32,7 +33,7 @@ def tokens(text):
     return result
 
 
-def rank_hybrid(lexical, vector, tiers):
+def rank_hybrid(lexical, vector, tiers, query=None):
     scores = defaultdict(float)
     for ranking, weight in ((lexical[:30], .25), (vector[:30], .75)):
         for rank, path in enumerate(ranking, 1):
@@ -45,12 +46,15 @@ def rank_hybrid(lexical, vector, tiers):
     rest = [path for path in fused if scores[path] < cutoff]
     near.sort(key=lambda path: (AUTHORITY[tiers[path]], -scores[path], path))
     fused = near + rest
-    # A cross-language query can have misleading lexical hits. Preserve the
-    # strongest semantic candidate in the first three without overriding rank 1.
-    if vector and vector[0] in fused and fused.index(vector[0]) >= 3:
-        fused.remove(vector[0])
-        fused.insert(2, vector[0])
-    return fused
+    # Explicit note identifiers are a lexical lookup: semantic similarity can
+    # otherwise prefer a related note that mentions the same project/topic.
+    if query and EXPLICIT_IDENTIFIER.search(query) and lexical:
+        return lexical + [path for path in fused if path not in lexical]
+    # Fusion can bury good semantic candidates when lexical terms overlap with
+    # a related but wrong note. Keep vector's first three as the high-recall
+    # semantic shortlist, then use fusion to order the remaining candidates.
+    semantic = [path for path in vector[:3] if path in fused]
+    return semantic + [path for path in fused if path not in semantic]
 
 
 class SnapshotSearch:
@@ -198,7 +202,7 @@ class SnapshotSearch:
                 if path not in similarities or score > similarities[path][0]:
                     similarities[path] = (score, ordinal)
             vector = [path for path, _ in sorted(similarities.items(), key=lambda pair: (-pair[1][0], pair[0]))]
-        ranking = lexical if strategy == "lexical" else vector if strategy == "vector" else rank_hybrid(lexical, vector, tiers)
+        ranking = lexical if strategy == "lexical" else vector if strategy == "vector" else rank_hybrid(lexical, vector, tiers, query)
         results = []
         for path in ranking:
             if not permitted(path, prefixes):
