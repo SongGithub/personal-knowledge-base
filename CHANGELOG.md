@@ -16,6 +16,8 @@
 - An old indexed version of an updated note reports indexing pending while the
   latest saved content awaits indexing. Persistence remains a separate result.
 - Cloud fetch revision is checked in JSON text and structured MCP responses.
+- Allow bounded MCP/OAuth request bursts: live OpenClaw connection setup and
+  tool calls exceeded the previous two-requests-per-second stage target.
 
 ## Cloud KB 0.2.1
 

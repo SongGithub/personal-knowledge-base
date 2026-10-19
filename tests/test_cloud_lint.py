@@ -7,6 +7,14 @@ from tools.lint_infra import validate
 
 
 class InfraLintTests(unittest.TestCase):
+    def test_mcp_handshake_has_bounded_request_headroom(self):
+        template = json.loads((Path(__file__).parents[1] /
+                               "infra/application.template.json").read_text())
+        resources = template["Resources"]
+        self.assertEqual(resources["DefaultStage"]["Properties"]["DefaultRouteSettings"],
+                         {"ThrottlingBurstLimit": 20, "ThrottlingRateLimit": 5})
+        self.assertEqual(resources["ApiFunction"]["Properties"]["ReservedConcurrentExecutions"], 2)
+
     def permissions(self, action):
         template = {"Resources": {"Policy": {"Type": "AWS::IAM::ManagedPolicy", "Properties": {
             "PolicyDocument": {"Version": "2012-10-17", "Statement": [{

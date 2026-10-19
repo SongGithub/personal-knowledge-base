@@ -62,4 +62,16 @@ No financial note text or private client identifiers belong in this repository.
   all ordinary folders. Deployment may add only that update capability to this
   already registered/granted client, preserving expiry and other approved
   scopes, with an atomic decision audit. Future clients use the owner page.
-- Live deployment and a synthetic authenticated cloud update remain pending.
+- Cloud KB 0.3.0 deployed successfully from `6992dcb66395`; both Lambda
+  hashes and all deployed source files match the immutable release artifact.
+  Anonymous MCP and grant changes are denied; Google configuration is preserved.
+- The current client's explicitly approved update scope was added with an
+  atomic audit and its original expiry preserved. The owner then completed the
+  Google owner page and explicitly renewed read/create/update access for 365
+  days. That newer browser decision is authoritative and must be preserved.
+- Live OpenClaw OAuth refresh succeeded. Its MCP catalog exposes `update_note`,
+  but the old 2 RPS / 10 burst stage setting throttled connection/tool traffic.
+  Raise the bounded stage target to 5 RPS / 20 burst, keeping Lambda reserved
+  concurrency at two; rerun the authenticated synthetic update after rollout.
+  [AWS throttling behaviour](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html).
+- A synthetic authenticated cloud update remains pending.

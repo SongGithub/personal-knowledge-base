@@ -207,8 +207,8 @@
         "StageName": "$default",
         "AutoDeploy": true,
         "DefaultRouteSettings": {
-          "ThrottlingBurstLimit": 10,
-          "ThrottlingRateLimit": 2
+          "ThrottlingBurstLimit": 20,
+          "ThrottlingRateLimit": 5
         }
       }
     },
