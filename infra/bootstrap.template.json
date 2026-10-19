@@ -583,8 +583,9 @@
                   "Resource": {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames"},
                   "Condition": {"StringEquals": {
                     "apigateway:Request/EndpointType": "REGIONAL",
-                    "apigateway:Request/RoutingMode": "API_MAPPING_ONLY",
-                    "apigateway:Request/SecurityPolicy": "TLS_1_2"
+                    "apigateway:Request/SecurityPolicy": "TLS_1_2",
+                    "aws:RequestTag/Project": {"Ref": "ProjectName"},
+                    "aws:RequestTag/Environment": {"Ref": "Environment"}
                   }}
                 },
                 {
