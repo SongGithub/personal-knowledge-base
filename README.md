@@ -15,6 +15,10 @@ outside Git.
 ## Current status
 
 The local retrieval experiment and read-only local MCP service are implemented.
+The cloud MCP has deployed read/search tools. A separate code change adds
+scope-limited raw learning capture into unverified `Ideas/` Markdown; it is not
+deployed or available to AI clients until the release pipeline and client grant
+are updated.
 See the [shared retrieval spec](specs/003-shared-kb-retrieval/spec.md) and
 [OpenClaw connection guide](docs/openclaw-kb-connection.md) to configure
 OpenClaw. ChatGPT-specific connectivity remains a separate, unimplemented

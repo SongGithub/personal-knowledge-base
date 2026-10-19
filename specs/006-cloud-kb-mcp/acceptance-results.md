@@ -23,6 +23,13 @@ This file records aggregate checks only; private note paths and content remain o
 - T042 stays open for live freshness/deletion and offline-Mac checks. The OAuth tool checks above prove the new hybrid release for one synthetic-only client; they do not grant that client access to private notes.
 - The original feature's two-client, writeback, migration, alarm and cost acceptance tasks remain open. This release is read-only and does not establish cloud writeback or a source-of-truth cutover.
 
+## Writeback implementation evidence (not deployed)
+
+- The `codex/kb-writeback` change adds `capture_learning` and `get_change_status`; it writes raw Markdown under a separately granted `Ideas/` prefix, marks the note `unverified`, and relies on the existing S3 `ObjectCreated` event for asynchronous indexing.
+- Synthetic tests exercise conditional S3 creation, same-operation replay, changed-content operation-ID rejection, retry after a storage failure, separate `kb:capture` authorization, synthetic MCP HTTP persistence, and an independently authorized second client fetching the new note.
+- The API role's S3 `PutObject` permission and both runtime-permissions-boundary templates are narrowed to `notes/Ideas/*`; read access remains separately scoped by the per-client grant.
+- No private note has been written, no write grant has been created, and no write-enabled release has been deployed. The MCP remains read-only until T049 passes.
+
 ## Failure and correction record
 
 - A mocked deployment test initially inherited CodeBuild's ingestion setting; the test was isolated and the gate rerun.

@@ -47,10 +47,10 @@ synthetic cases while home devices are offline; invalid/revoked credentials fail
 **Independent acceptance**: One client persists learning; another fetches its
 revision immediately. Duplicate IDs, concurrent edits and self-approval fail safely.
 
-- [ ] T015 [US2] Implement idempotent operations, conditional note writes and recoverable audit/outbox state in `cloud_kb/writer.py`.
+- [x] T015 [US2] Implement an idempotent new-note capture operation with conditional S3 creation, durable status, provenance, retry recovery and S3-triggered indexing in `cloud_kb/writer.py`.
 - [ ] T016 [US2] Implement exact-content/base-revision owner review and configured proposal destinations in `cloud_kb/review.py`.
 - [ ] T017 [US2] Expose capture/update/status under separate scopes in `cloud_kb/api.py`.
-- [ ] T018 [US2] Record persistence/fetch, duplicate, conflict and canonical-review acceptance in `specs/006-cloud-kb-mcp/acceptance-results.md`.
+- [ ] T018 [US2] Record deployed persistence/fetch, duplicate, conflict and canonical-review acceptance in `specs/006-cloud-kb-mcp/acceptance-results.md`.
 
 ## Phase 5: US3 - Independent ingestion (P1)
 
@@ -136,6 +136,8 @@ provisioning; real Google consent and the T033 proof passed on 2026-10-19.
 - [ ] T045 [US1] Choose and verify the deployed default after the v2 fixture found vector ahead of hybrid on top-one retrieval. Keep the default-winner gate enforced for subsequent model/ranking releases.
 - [x] T046 [US1] Extend the live comparison to 33 synthetic queries across paraphrase, near-collision, exact identifier and cross-language retrieval; verify authorization filtering, stale/deleted sources, corrupted snapshots, provider-outage lexical access and deployed-index latency. Record aggregate evidence and the provisional default recommendation in `model-decision.md` (2026-10-19).
 - [ ] T047 [US1] Build a private, owner-judged 20–30-query relevance set, fix the cross-language fusion miss, and rerun the live default-winner gate before changing the deployed strategy. Add a no-answer/abstention contract if it is required for client behavior.
+- [x] T048 [US2] Add synthetic `capture_learning` and `get_change_status` MCP tools with a separate `kb:capture` scope; persist raw, unverified Markdown only under granted `Ideas/` prefixes and restrict runtime S3 PutObject permission to that tree.
+- [ ] T049 [US2] Deploy writeback through CodeBuild, authorize a named client with a bounded owner grant, and verify real S3 persistence, immediate cross-client fetch, background indexing, retry behavior and denial of non-Ideas/canonical writes.
 
 T037–T042 refine T011 and T019–T023. Complete their parent markers only when
 their full original scope, including approval and deployed acceptance, is met.

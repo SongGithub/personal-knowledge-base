@@ -8,6 +8,7 @@ from cryptography.fernet import Fernet
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.google import GoogleProvider
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from cloud_kb.storage import normalize_path
 
 
 class DynamoOAuthStore:
@@ -93,7 +94,7 @@ class GrantGate:
     def __init__(self, table, owner_sub):
         self.table, self.owner_sub = table, owner_sub
 
-    def read_prefixes(self, token):
+    def _grant(self, token):
         if token is None or token.claims.get("sub") != self.owner_sub or not token.client_id:
             raise ToolError("forbidden")
         if token.expires_at is None or token.expires_at <= time.time():
@@ -102,10 +103,37 @@ class GrantGate:
             Key={"PK": "GRANT#" + self.owner_sub, "SK": "CLIENT#" + token.client_id},
             ConsistentRead=True,
         ).get("Item", {})
-        if (grant.get("Revoked", True) or float(grant.get("ExpiresAt", 0)) <= time.time() or
-                "kb:read" not in grant.get("Scopes", [])):
+        if grant.get("Revoked", True) or float(grant.get("ExpiresAt", 0)) <= time.time():
+            raise ToolError("forbidden")
+        return grant
+
+    def read_prefixes(self, token):
+        grant = self._grant(token)
+        if "kb:read" not in grant.get("Scopes", []):
             raise ToolError("forbidden")
         prefixes = grant.get("Prefixes", [])
         if not isinstance(prefixes, list) or not all(isinstance(prefix, str) for prefix in prefixes):
             raise ToolError("forbidden")
         return prefixes
+
+    def capture_prefixes(self, token):
+        grant = self._grant(token)
+        if "kb:capture" not in grant.get("Scopes", []):
+            raise ToolError("forbidden")
+        prefixes = grant.get("CapturePrefixes", [])
+        if (not isinstance(prefixes, list) or not prefixes or
+                not all(isinstance(prefix, str) and prefix.startswith("Ideas/") and
+                        prefix.endswith("/") for prefix in prefixes)):
+            raise ToolError("forbidden")
+        try:
+            for prefix in prefixes:
+                normalize_path(prefix + "scope.md")
+        except ValueError:
+            raise ToolError("forbidden") from None
+        return prefixes
+
+    def operation_identity(self, token):
+        grant = self._grant(token)
+        if "kb:capture" not in grant.get("Scopes", []):
+            raise ToolError("forbidden")
+        return self.owner_sub, token.client_id

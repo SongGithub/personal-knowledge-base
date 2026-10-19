@@ -17,7 +17,7 @@ phases:
   pre_build:
     commands:
       - /tmp/pkb-native/bin/python tools/lint_infra.py infra/foundation.template.json infra/bootstrap.template.json infra/application.template.json infra/native-pipeline.template.json
-      - /tmp/pkb-native/bin/python -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_hybrid tests.test_cloud_benchmark tests.test_cloud_lint -v
+      - /tmp/pkb-native/bin/python -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_hybrid tests.test_cloud_benchmark tests.test_cloud_writer tests.test_cloud_lint -v
       - |
         if [ -n "${PKB_APPROVED_EMBEDDING_MODEL_ARN:-}" ]; then
           if [ "${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true" ]; then
