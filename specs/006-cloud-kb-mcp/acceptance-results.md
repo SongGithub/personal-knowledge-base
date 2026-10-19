@@ -16,10 +16,11 @@ This file records aggregate checks only; private note paths and content remain o
 - The active SQLite snapshot contains 152 Markdown notes and 2,457 chunks. Its SHA-256 matches the active descriptor; every stored vector has 4,096 bytes (1,024 float32 dimensions).
 - Both the Markdown and index buckets have all four S3 public access blocks enabled and default SSE-S3 encryption (`AES256`). The active snapshot object itself reports `AES256` encryption.
 - A direct production-code search over the active snapshot with a synthetic query found the synthetic fixture using lexical, vector and hybrid strategies; each returned current S3 evidence. Direct fetch matched the fixture SHA-256. No private note path or excerpt was printed.
+- The deployed HTTPS MCP passed Google OAuth verification after this release: unauthenticated tool access was denied; the authenticated verifier found current synthetic evidence through lexical, vector and hybrid tools; and `fetch_note` matched the fixture SHA-256. The verifier's DynamoDB grant was checked to have only `kb:read`, the exact synthetic note path, `SyntheticOnly=true`, and a 30-minute expiry.
 
 ## Remaining acceptance
 
-- T042 stays open until the deployed HTTPS MCP is exercised through Google OAuth for all three strategies and fetch, plus freshness/deletion and offline-Mac checks. The earlier Google-authenticated mock proof applied to the prior synthetic lexical snapshot; it does not prove the new hybrid release.
+- T042 stays open for live freshness/deletion and offline-Mac checks. The OAuth tool checks above prove the new hybrid release for one synthetic-only client; they do not grant that client access to private notes.
 - The original feature's two-client, writeback, migration, alarm and cost acceptance tasks remain open. This release is read-only and does not establish cloud writeback or a source-of-truth cutover.
 
 ## Failure and correction record
