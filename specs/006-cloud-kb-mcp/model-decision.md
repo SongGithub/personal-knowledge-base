@@ -44,10 +44,41 @@ winner, so a model-configuration release cannot claim hybrid is best. The
 comparison gate evaluates the deployed default against the strongest strategy
 on the same cases and blocks a mismatched release. This is a fixture-level
 decision, not evidence that vector search is universally better on the private
-corpus. The default choice is pending owner review.
+corpus.
 
-The v2 minimum quality floor requires at least 18 cases, two cross-language
-cases and four exact-identifier cases; the default hybrid must reach at least
+The subsequent `synthetic-retrieval-stress-v3` fixture has 20 fully synthetic
+notes and 33 judged queries. It adds similar notes with different answers,
+paraphrases, near-matching identifiers and six cross-language cases. The live
+Bedrock Sydney run on 2026-10-19 measured lexical top-1/top-3 at 22/33 and
+26/33, vector at 28/33 and 33/33, and hybrid at 25/33 and 31/33. Exact-ID
+top-1 was 7/7 lexical, 6/7 vector and 6/7 hybrid. Cross-language top-3 was
+1/6 lexical, 6/6 vector and 5/6 hybrid. The hybrid quality gate now fails,
+correctly blocking a model/ranking release until the miss is resolved. Synthetic
+median query times were 0.5 ms lexical, 136.8 ms vector and 135.3 ms hybrid;
+these use an in-memory 20-note index and exclude HTTP and cold starts.
+
+A direct read-only check of the deployed 152-note, 2,457-chunk private index
+used three generic queries. One cold snapshot load took 10.9 seconds; later
+backend searches were roughly 0.6–0.8 seconds across strategies. A
+deterministic 12-note sample selected by hashing eligible unique titles found
+the expected note at rank one in 11/12 lexical, 10/12 vector and 11/12 hybrid;
+all reached top three in 12/12. Only aggregate results were printed. Title
+lookup favors lexical matching and cannot substitute for human-judged natural
+language relevance. These measurements are direct backend calls, not deployed
+OAuth/HTTP latency or availability tests.
+
+**Recommendation:** retain the deployed hybrid default for now; do not infer
+from the small synthetic set that vector is better for the owner's actual
+questions. Fix the cross-language fusion miss, then judge 20–30 private
+representative questions with expected notes across exact lookup, English,
+Chinese, cross-language and ambiguous topics. Keep the exact lexical and pure
+vector strategies exposed. If vector still leads on that private set, change
+the default with a new versioned gate. The current search always ranks a
+candidate for vector queries and has no relevance threshold or abstention
+test; no-answer behavior needs its own design and evaluation.
+
+The v3 minimum quality floor requires at least 30 cases, six cross-language
+cases and seven exact-identifier cases; the configured default must reach at least
 75% top-1, 90% top-3, all cross-language top-3, all but one exact top-1, and
 remain within one top-1 result of lexical. The separate winner gate requires
 the configured default to rank first by top-1, then top-3, cross-language

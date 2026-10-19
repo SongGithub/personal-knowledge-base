@@ -13,6 +13,7 @@ import math
 from pathlib import Path
 import sqlite3
 import sys
+from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -73,8 +74,12 @@ def benchmark(embeddings, fixture):
     search = SnapshotSearch(SyntheticS3(raw), "synthetic-index", SyntheticTable(descriptor), SyntheticNotes(notes), embeddings)
     results = {}
     for strategy in ("lexical", "vector", "hybrid"):
-        ranked = [search.search(case["query"], ["Projects/", "Areas/", "Resources/", "Ideas/"],
-                                limit=5, strategy=strategy)["results"] for case in fixture["cases"]]
+        ranked, timings = [], []
+        for case in fixture["cases"]:
+            started = perf_counter()
+            ranked.append(search.search(case["query"], ["Projects/", "Areas/", "Resources/", "Ideas/"],
+                                        limit=5, strategy=strategy)["results"])
+            timings.append((perf_counter() - started) * 1000)
         total = len(ranked)
         top1 = sum(bool(rows and rows[0]["path"] == case["expected"])
                    for rows, case in zip(ranked, fixture["cases"]))
@@ -89,24 +94,38 @@ def benchmark(embeddings, fixture):
         cross_top3 = sum(fixture["cases"][i]["expected"] in [row["path"] for row in ranked[i][:3]] for i in cross)
         exact = [i for i, case in enumerate(fixture["cases"]) if case.get("exact_match")]
         exact_top1 = sum(bool(ranked[i] and ranked[i][0]["path"] == fixture["cases"][i]["expected"]) for i in exact)
+        def category_of(case):
+            return case.get("category") or ("identifier" if case.get("exact_match") else
+                                            "cross_language" if case.get("cross_language") else "baseline")
+        categories = {}
+        for category in sorted({category_of(case) for case in fixture["cases"]}):
+            indices = [i for i, case in enumerate(fixture["cases"]) if category_of(case) == category]
+            categories[category] = {"top1": sum(bool(ranked[i] and ranked[i][0]["path"] == fixture["cases"][i]["expected"])
+                                                 for i in indices),
+                                    "top3": sum(fixture["cases"][i]["expected"] in [row["path"] for row in ranked[i][:3]]
+                                                for i in indices), "total": len(indices)}
+        ordered_ms = sorted(timings)
         results[strategy] = {"top1": top1, "top3": top3, "total": total,
                              "cross_language_top3": cross_top3, "cross_language_total": len(cross),
                              "exact_top1": exact_top1, "exact_total": len(exact),
-                             "mrr": round(sum(reciprocal_ranks) / total, 4)}
+                             "mrr": round(sum(reciprocal_ranks) / total, 4),
+                             "categories": categories,
+                             "latency_ms": {"median": round(ordered_ms[len(ordered_ms) // 2], 1),
+                                            "p95": round(ordered_ms[math.ceil(.95 * len(ordered_ms)) - 1], 1)}}
     return results
 
 
 def quality_gate(results):
-    lexical, hybrid = results["lexical"], results["hybrid"]
+    lexical, selected = results["lexical"], results[DEFAULT_STRATEGY]
     # The floor is deliberately bounded to this versioned synthetic fixture.
     # It catches missing/wrong embedding modes, vector corruption and rank drift.
-    return (hybrid["total"] >= 18 and hybrid["cross_language_total"] >= 2 and
-            hybrid["exact_total"] >= 4 and
-            hybrid["top1"] >= math.ceil(.75 * hybrid["total"]) and
-            hybrid["top3"] >= math.ceil(.90 * hybrid["total"]) and
-            hybrid["exact_top1"] >= hybrid["exact_total"] - 1 and
-            hybrid["cross_language_top3"] == hybrid["cross_language_total"] and
-            hybrid["top1"] >= lexical["top1"] - 1)
+    return (selected["total"] >= 30 and selected["cross_language_total"] >= 6 and
+            selected["exact_total"] >= 7 and
+            selected["top1"] >= math.ceil(.75 * selected["total"]) and
+            selected["top3"] >= math.ceil(.90 * selected["total"]) and
+            selected["exact_top1"] >= selected["exact_total"] - 1 and
+            selected["cross_language_top3"] == selected["cross_language_total"] and
+            selected["top1"] >= lexical["top1"] - 1)
 
 
 def compare_strategies(results, default=DEFAULT_STRATEGY):

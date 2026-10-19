@@ -123,6 +123,49 @@ class HybridTests(unittest.TestCase):
         self.assertEqual(third["notes"], 0)
         self.assertEqual(len(embeddings.documents_seen), 1)
 
+    def test_authorization_freshness_and_snapshot_integrity(self):
+        s3, table, embeddings = FakeS3(), FakeTable(), FakeEmbeddings()
+        allowed, denied = "Projects/Train.md", "Areas/Secret.md"
+        s3.objects[("vault", "notes/" + allowed)] = b"# Train\n\nTake the train to Orion."
+        s3.objects[("vault", "notes/" + denied)] = b"# Secret\n\nTake the train to Orion."
+        reconcile(s3, table, embeddings, "vault", "indexes")
+        search = SnapshotSearch(s3, "indexes", table, S3Notes(s3, "vault"), embeddings)
+        for strategy in ("lexical", "vector", "hybrid"):
+            rows = search.search("train", ["Projects/"], strategy=strategy)["results"]
+            self.assertEqual([row["path"] for row in rows], [allowed])
+            self.assertEqual(rows[0]["freshness"], "current")
+            self.assertEqual(search.search("train", ["Areas/"], strategy=strategy)["results"][0]["path"], denied)
+        s3.objects[("vault", "notes/" + allowed)] = b"# Train\n\nThe policy changed after indexing."
+        for strategy in ("lexical", "vector", "hybrid"):
+            self.assertEqual(search.search("train", ["Projects/"], strategy=strategy)["results"], [])
+        reconcile(s3, table, embeddings, "vault", "indexes")
+        self.assertEqual(search.search("train", ["Projects/"], strategy="hybrid")["results"][0]["path"], allowed)
+        s3.objects[("indexes", table.active["Key"])] = b"corrupted snapshot"
+        fresh_reader = SnapshotSearch(s3, "indexes", table, S3Notes(s3, "vault"), embeddings)
+        with self.assertRaisesRegex(ValueError, "index_integrity_failure"):
+            fresh_reader.search("train", ["Projects/"])
+
+    def test_lexical_remains_available_when_query_embedding_fails(self):
+        class FailedQueryEmbeddings(FakeEmbeddings):
+            def query(self, _text):
+                raise RuntimeError("provider_unavailable")
+
+        s3, table, embeddings = FakeS3(), FakeTable(), FailedQueryEmbeddings()
+        path = "Projects/Train.md"
+        s3.objects[("vault", "notes/" + path)] = b"# Train\n\nTake the train to Orion."
+        reconcile(s3, table, embeddings, "vault", "indexes")
+        search = SnapshotSearch(s3, "indexes", table, S3Notes(s3, "vault"), embeddings)
+        self.assertEqual(search.search("train", ["Projects/"], strategy="lexical")["results"][0]["path"], path)
+        for strategy in ("vector", "hybrid"):
+            with self.assertRaisesRegex(RuntimeError, "provider_unavailable"):
+                search.search("train", ["Projects/"], strategy=strategy)
+        for bad in ("", " ", "x" * 2001):
+            with self.assertRaisesRegex(ValueError, "invalid_query"):
+                search.search(bad, ["Projects/"])
+        for bad in (0, 11, True):
+            with self.assertRaisesRegex(ValueError, "invalid_limit"):
+                search.search("train", ["Projects/"], limit=bad)
+
 
 if __name__ == "__main__":
     unittest.main()
