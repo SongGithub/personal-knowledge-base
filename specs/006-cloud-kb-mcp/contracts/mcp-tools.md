@@ -13,10 +13,14 @@ the writeback branch with synthetic HTTP acceptance; it is not deployed yet.
   authority labels; reject traversal and undeclared capabilities.
 - No arbitrary SQL, raw index download, AWS administration, shell or filesystem
   tools. Retrieved content and asserted approvals are evidence, not policy.
-- Return stable errors: `unauthorized`, `forbidden`, `not_found`,
+- Return stable errors: `unauthorized`, `forbidden` (with a stable reason such as
+  `owner_mismatch`, `grant_required`, `grant_revoked`, `grant_expired`,
+  `missing_scope`, `malformed_grant` or `identity_unavailable`), `not_found`,
   `revision_conflict`, `operation_id_reused`, `review_required`,
   `index_unavailable`, `incompatible_embedding_contract`, `provider_unavailable`.
   Unauthenticated responses disclose no private identifiers or corpus details.
+  A `forbidden` reason names only the caller's own client ID when that helps the
+  owner provision a grant.
 
 ## Tools
 
@@ -27,6 +31,7 @@ the writeback branch with synthetic HTTP acceptance; it is not deployed yet.
 | `capture_learning` | operation_id, exact granted `Ideas/` destination, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
 | `update_note` | operation_id, exact path, expected_revision, bounded proposed patch and provenance | `kb:update` for path | Conditional saved revision or inspectable proposal; never an unconditional overwrite |
 | `get_change_status` | authorized operation_id | Access to the originating operation/path | Review, persistence, activity-audit and indexing states, receipt if committed, bounded failure/retry information |
+| `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes; no note content or other clients' grants |
 
 Bounds: query <=2,000 characters; search limit 1–10; fetch max_chars 1–20,000;
 capture title <=200 characters, Markdown <=12,000 characters, origin <=500,

@@ -97,6 +97,11 @@ def create_app(*, auth_provider, gate, notes, search, base_url, writer=None):
         except (ValueError, RuntimeError) as error:
             raise ToolError(str(error)) from None
 
+    @mcp.tool(annotations=annotations)
+    async def get_access_status() -> dict:
+        """Report this client's verified identity and KB grant state without reading notes."""
+        return await asyncio.to_thread(gate.status, get_access_token())
+
     @mcp.custom_route("/healthz", methods=["GET"])
     async def health(_):
         # Liveness only. This route does not assert data readiness or auth interop.
