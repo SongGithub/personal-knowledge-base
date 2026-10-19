@@ -170,8 +170,59 @@
             "Key": "Purpose",
             "Value": "canonical-knowledge"
           }
-        ]
-      }
+        ],
+        "NotificationConfiguration": {
+          "QueueConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Queue": {
+                "Fn::GetAtt": [
+                  "IngestionQueue",
+                  "Arn"
+                ]
+              },
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": "notes/"
+                    },
+                    {
+                      "Name": "suffix",
+                      "Value": ".md"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "Event": "s3:ObjectRemoved:*",
+              "Queue": {
+                "Fn::GetAtt": [
+                  "IngestionQueue",
+                  "Arn"
+                ]
+              },
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": "notes/"
+                    },
+                    {
+                      "Name": "suffix",
+                      "Value": ".md"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "DependsOn": "IngestionQueuePolicy"
     },
     "DataBucketPolicy": {
       "Type": "AWS::S3::BucketPolicy",
@@ -779,6 +830,22 @@
               "Version": "2012-10-17",
               "Statement": [
                 {
+                  "Sid": "ListMarkdownSources",
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "DataBucket",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "StringLike": {
+                      "s3:prefix": "notes/*"
+                    }
+                  }
+                },
+                {
                   "Sid": "ReadSources",
                   "Effect": "Allow",
                   "Action": [
@@ -901,6 +968,47 @@
         },
         "RetentionInDays": {
           "Ref": "LogRetentionDays"
+        }
+      }
+    },
+    "IngestionQueuePolicy": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "Queues": [
+          {
+            "Ref": "IngestionQueue"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowOnlyVaultNotifications",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "s3.amazonaws.com"
+              },
+              "Action": "sqs:SendMessage",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "IngestionQueue",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}"
+                  }
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     }

@@ -182,6 +182,27 @@ settings, exercise rollback/restore and confirm restricted deployment permission
   External private-content model calls MUST wait for provider/model approval and
   a recorded data boundary. Model replacement MUST compare bilingual retrieval
   quality and use compatible document/query embeddings.
+- **FR-013a**: Cloud `search_kb` MUST accept `lexical`, `vector`, and `hybrid`,
+  default to `hybrid`, and preserve the local tokenizer/chunker, lexical scoring,
+  reciprocal-rank fusion weights and near-tie authority rule unless a measured
+  bilingual comparison justifies a documented change. The initial cloud index
+  MUST cover the migrated S3 Markdown corpus before production parity is claimed.
+  Query embedding runs during semantic MCP searches; document embedding runs
+  during independent initial/incremental ingestion. Index and query must pin the
+  same embedding contract. A changed model requires a separate full re-embedding.
+- **FR-013b**: Pull-request CI MUST check deterministic tokenization, vector
+  validation, incremental reuse, deletion safety and fusion on synthetic data.
+  The trusted deployment pipeline MUST invoke the selected real embedding model
+  on a versioned synthetic English/Chinese benchmark and stop deployment if its
+  documented quality floor fails. CI MUST NOT load the private KB or publish
+  private paths, text, vectors or benchmark queries.
+- **FR-013c**: Model-configuration changes MUST compare lexical, pure-vector
+  ranking and the configured default on the same versioned synthetic cases,
+  including bilingual, cross-language and exact-identifier queries. The trusted
+  deployment gate MUST report top-1, top-3, reciprocal-rank and category results,
+  and stop a model/retrieval-configuration release when the configured default
+  loses the documented comparison.
+  Pull-request CI MUST exercise the comparison logic without cloud credentials.
 - **FR-014**: Deployment MUST use reviewable declarative configuration and scoped
   temporary credentials, with separate human/deployer, provisioning, runtime and
   application identities. Code release MUST NOT bundle private knowledge.

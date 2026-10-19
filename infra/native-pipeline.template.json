@@ -31,6 +31,15 @@
         "false"
       ]
     },
+    "RequireDefaultWinner": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "Description": "Require the configured search default to win the live synthetic comparison when model or retrieval configuration changed."
+    },
     "SourceCommit": {
       "Type": "String",
       "AllowedPattern": "^[0-9a-f]{40}$",
@@ -118,6 +127,18 @@
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"
                 }
               ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": "s3:ListBucket",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}"
+              },
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": "notes/*"
+                }
+              }
             },
             {
               "Effect": "Allow",
@@ -254,7 +275,8 @@
                     "s3:ListTagsForResource",
                     "s3:GetBucketAbac",
                     "s3:GetIntelligentTieringConfiguration",
-                    "s3:GetBucketMetadataTableConfiguration"
+                    "s3:GetBucketMetadataTableConfiguration",
+                    "s3:PutBucketNotification"
                   ],
                   "Resource": [
                     {
@@ -309,6 +331,17 @@
                       "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion-dlq"
                     }
                   ]
+                },
+                {
+                  "Sid": "ConfigureOnlyIngestionQueuePolicy",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SetQueueAttributes",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion"
+                  }
                 },
                 {
                   "Sid": "ProjectLogGroups",
@@ -409,7 +442,7 @@
                   }
                 },
                 {
-                  "Sid": "ManageOnlyApiFunction",
+                  "Sid": "ManageOnlyKbFunctions",
                   "Effect": "Allow",
                   "Action": [
                     "lambda:CreateFunction",
@@ -432,17 +465,84 @@
                     "lambda:GetRuntimeManagementConfig",
                     "lambda:GetFunctionScalingConfig"
                   ],
-                  "Resource": {
-                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${Environment}-api"
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${Environment}-api"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${Environment}-ingestion"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "ManageOnlyIngestionEventMapping",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:CreateEventSourceMapping",
+                    "lambda:UpdateEventSourceMapping",
+                    "lambda:DeleteEventSourceMapping",
+                    "lambda:GetEventSourceMapping"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "ArnEquals": {
+                      "lambda:FunctionArn": {
+                        "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${Environment}-ingestion"
+                      }
+                    }
                   }
                 },
                 {
-                  "Sid": "PassOnlyApiRuntime",
+                  "Sid": "TagOnlyNewProjectMappings",
+                  "Effect": "Allow",
+                  "Action": "lambda:TagResource",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:event-source-mapping:*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:RequestTag/Project": {
+                        "Ref": "ProjectName"
+                      },
+                      "aws:RequestTag/Environment": {
+                        "Ref": "Environment"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "MaintainOnlyProjectMappingTags",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:UntagResource",
+                    "lambda:ListTags"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:event-source-mapping:*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/Project": {
+                        "Ref": "ProjectName"
+                      },
+                      "aws:ResourceTag/Environment": {
+                        "Ref": "Environment"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "PassOnlyKbRuntimes",
                   "Effect": "Allow",
                   "Action": "iam:PassRole",
-                  "Resource": {
-                    "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
-                  },
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-api"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-ingestion"
+                    }
+                  ],
                   "Condition": {
                     "StringEquals": {
                       "iam:PassedToService": "lambda.amazonaws.com"
@@ -741,6 +841,56 @@
                       }
                     }
                   }
+                },
+                {
+                  "Fn::If": [
+                    "HasApprovedModel",
+                    {
+                      "Sid": "SyntheticEmbeddingBenchmark",
+                      "Effect": "Allow",
+                      "Action": "bedrock:InvokeModel",
+                      "Resource": {
+                        "Ref": "ApprovedEmbeddingModelArn"
+                      }
+                    },
+                    {
+                      "Ref": "AWS::NoValue"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "StartInitialIndexBuild",
+                  "Effect": "Allow",
+                  "Action": "sqs:SendMessage",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-ingestion"
+                  }
+                },
+                {
+                  "Fn::If": [
+                    "HasApprovedModel",
+                    {
+                      "Sid": "ReadOnlyIndexBuildReceipt",
+                      "Effect": "Allow",
+                      "Action": "dynamodb:GetItem",
+                      "Resource": {
+                        "Fn::Sub": "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-${Environment}-control"
+                      },
+                      "Condition": {
+                        "ForAllValues:StringLike": {
+                          "dynamodb:LeadingKeys": [
+                            "JOB#*"
+                          ]
+                        },
+                        "Null": {
+                          "dynamodb:LeadingKeys": "false"
+                        }
+                      }
+                    },
+                    {
+                      "Ref": "AWS::NoValue"
+                    }
+                  ]
                 }
               ]
             }
@@ -851,11 +1001,36 @@
                 "Ref": "AWS::Region"
               },
               "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "PKB_APPROVED_EMBEDDING_MODEL_ARN",
+              "Value": {
+                "Ref": "ApprovedEmbeddingModelArn"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "PKB_REQUIRE_DEFAULT_WINNER",
+              "Value": {
+                "Ref": "RequireDefaultWinner"
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "PKB_ENABLE_INGESTION",
+              "Value": {
+                "Fn::If": [
+                  "HasApprovedModel",
+                  "true",
+                  "false"
+                ]
+              },
+              "Type": "PLAINTEXT"
             }
           ]
         },
         "ConcurrentBuildLimit": 1,
-        "TimeoutInMinutes": 15,
+        "TimeoutInMinutes": 30,
         "QueuedTimeoutInMinutes": 10,
         "Cache": {
           "Type": "NO_CACHE"

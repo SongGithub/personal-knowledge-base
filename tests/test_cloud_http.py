@@ -119,7 +119,7 @@ class CloudHTTPTests(unittest.TestCase):
         async with Client(origin + "/mcp", auth=token(), timeout=10) as client:
             tools = await client.list_tools()
             self.assertEqual({tool.name for tool in tools}, {"search_kb", "fetch_note"})
-            found = (await client.call_tool("search_kb", {"query": "citrus-lantern-742"})).data
+            found = (await client.call_tool("search_kb", {"query": "citrus-lantern-742", "strategy": "lexical"})).data
             self.assertEqual(found["results"][0]["path"], PATH)
             self.assertEqual(found["results"][0]["freshness"], "current")
             fetched = (await client.call_tool("fetch_note", {"path": PATH})).data

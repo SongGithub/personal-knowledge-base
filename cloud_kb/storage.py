@@ -1,11 +1,25 @@
 """Bounded S3 reads with source revisions, independent of index freshness."""
 import hashlib
 from pathlib import PurePosixPath
+import re
 
 from botocore.exceptions import ClientError
 
 
 MAX_NOTE_BYTES = 256 * 1024
+
+
+def authority(path: str, text: str) -> str:
+    frontmatter = text.split("---", 2)[1].lower() if text.startswith("---\n") and text.count("---") >= 2 else ""
+    if "_review/" in path.lower() or re.search(r"^status:\s*(draft|unverified|working-model|待核对)", frontmatter, re.M):
+        return "unverified"
+    if path.endswith("/AGENTS.md") or path == "AGENTS.md" or re.search(r"^(status|authority):\s*(canonical|binding)", frontmatter, re.M):
+        return "canonical"
+    if set(path.lower().split("/")) & {"archive", "archives", "source archives", "source snapshots"}:
+        return "archive"
+    if re.search(r"^status:\s*(verified|confirmed)", frontmatter, re.M):
+        return "verified"
+    return "ordinary"
 
 
 def normalize_path(path: str) -> str:
@@ -57,7 +71,7 @@ class S3Notes:
             "path": path, "content": content[:max_chars],
             "revision": response.get("VersionId") or response["ETag"],
             "sha256": hashlib.sha256(raw).hexdigest(),
-            "tier": "canonical" if path.startswith("Wiki/") else "source",
+            "tier": authority(path, content),
             "truncated": len(content) > max_chars,
             "persistence": "persisted", "indexing": "not_checked",
         }

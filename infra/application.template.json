@@ -58,6 +58,20 @@
       "Type": "String",
       "AllowedPattern": "^[a-z0-9]+$",
       "Description": "API identity anchored by the separately reviewed trust bootstrap."
+    },
+    "IngestionExecutionRoleArn": {
+      "Type": "String"
+    },
+    "IngestionQueueArn": {
+      "Type": "String"
+    },
+    "EnableIngestion": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "true",
+        "false"
+      ]
     }
   },
   "Resources": {
@@ -75,7 +89,7 @@
           "x86_64"
         ],
         "Handler": "cloud_kb.api.handler",
-        "MemorySize": 256,
+        "MemorySize": 512,
         "Timeout": 25,
         "ReservedConcurrentExecutions": 2,
         "Code": {
@@ -197,6 +211,83 @@
           "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApiId}/*"
         }
       }
+    },
+    "IngestionFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-ingestion"
+        },
+        "Role": {
+          "Ref": "IngestionExecutionRoleArn"
+        },
+        "Runtime": "python3.12",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "cloud_kb.ingestion.handler",
+        "MemorySize": 1024,
+        "Timeout": 900,
+        "ReservedConcurrentExecutions": 1,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ReleaseBucket"
+          },
+          "S3Key": {
+            "Ref": "ReleaseKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "ReleaseVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "PKB_VAULT_BUCKET": {
+              "Ref": "VaultBucket"
+            },
+            "PKB_INDEX_BUCKET": {
+              "Ref": "IndexBucket"
+            },
+            "PKB_CONTROL_TABLE": {
+              "Ref": "ControlTable"
+            }
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          }
+        ]
+      }
+    },
+    "IngestionEventSource": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "EventSourceArn": {
+          "Ref": "IngestionQueueArn"
+        },
+        "FunctionName": {
+          "Ref": "IngestionFunction"
+        },
+        "BatchSize": 10,
+        "MaximumBatchingWindowInSeconds": 30,
+        "Enabled": {
+          "Fn::If": [
+            "IngestionEnabled",
+            true,
+            false
+          ]
+        }
+      }
     }
   },
   "Outputs": {
@@ -209,6 +300,16 @@
       "Value": {
         "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/auth/callback"
       }
+    }
+  },
+  "Conditions": {
+    "IngestionEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableIngestion"
+        },
+        "true"
+      ]
     }
   }
 }

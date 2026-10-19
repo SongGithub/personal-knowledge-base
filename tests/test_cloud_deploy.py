@@ -1,5 +1,6 @@
 """Verify deployment orchestration with test doubles; never contact AWS."""
 from io import BytesIO
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -58,7 +59,8 @@ class DeploymentTests(unittest.TestCase):
         cfn.describe_stacks.side_effect = ClientError({"Error": {"Code": "ValidationError", "Message": "Stack does not exist"}}, "DescribeStacks")
         trust = {"CloudFormationExecutionRoleArn": "scoped-role", "AuthSecretArn": "named-secret", "HttpApiId": "mockapi"}
         foundation = {"AuthSecretArn": "named-secret", "ReleaseBucketName": "code-only", "DataBucketName": "notes",
-                      "IndexBucketName": "indexes", "ControlTableName": "control", "ApiExecutionRoleArn": "api-runtime"}
+                      "IndexBucketName": "indexes", "ControlTableName": "control", "ApiExecutionRoleArn": "api-runtime",
+                      "IngestionExecutionRoleArn": "ingestion-runtime", "IngestionQueueArn": "synthetic-queue-arn"}
         endpoint = "https://mockapi.execute-api.ap-southeast-2.amazonaws.com/mcp"
         health = Mock()
         health.__enter__ = Mock(return_value=health)
@@ -66,7 +68,8 @@ class DeploymentTests(unittest.TestCase):
         health.status = 200
         health.read.return_value = b'{"status":"up"}'
         denied = HTTPError(endpoint, 401, "Unauthorized", {"WWW-Authenticate": "Bearer resource_metadata=\"https://synthetic.invalid\""}, None)
-        with patch("tools.deploy_cloud_app.outputs", side_effect=[trust, foundation, {"McpEndpoint": endpoint}]), \
+        with patch.dict(os.environ, {"PKB_ENABLE_INGESTION": "false"}), \
+                patch("tools.deploy_cloud_app.outputs", side_effect=[trust, foundation, {"McpEndpoint": endpoint}]), \
                 patch("tools.deploy_cloud_app.upload_release", return_value=("releases/mock.zip", "version", "digest")), \
                 patch("tools.deploy_cloud_app.urlopen", side_effect=[health, denied]):
             result = deploy(session, Deployment("scoped-role", "named-secret", "owner", '["http://localhost:8765/callback"]'), Path("unused.zip"))
