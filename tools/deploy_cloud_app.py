@@ -18,12 +18,12 @@ import uuid
 
 import boto3
 from botocore.exceptions import ClientError, WaiterError
-from cloud_kb.cloudflare import CloudflareDns, ensure_certificate_validated, verify_custom_endpoint
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DISABLED_DOMAIN_CERTIFICATE = "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000"
 sys.path.insert(0, str(ROOT))
+from cloud_kb.cloudflare import CloudflareDns, ensure_certificate_validated, verify_custom_endpoint
 from tools.seed_mock_kb import publish
 
 
