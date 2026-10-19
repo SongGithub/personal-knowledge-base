@@ -190,7 +190,7 @@ class CloudHTTPTests(unittest.TestCase):
             tools = await client.list_tools()
             self.assertEqual({tool.name for tool in tools},
                              {"search_kb", "fetch_note", "capture_learning",
-                              "get_change_status", "get_access_status"})
+                          "get_change_status", "get_access_status", "update_note"})
             access = (await client.call_tool("get_access_status", {})).data
             self.assertEqual(access["client_id"], "synthetic-client")
             self.assertTrue(access["owner"])

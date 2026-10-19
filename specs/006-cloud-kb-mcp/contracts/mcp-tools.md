@@ -4,7 +4,7 @@
 MCP client passed capture, exact-revision fetch, retry, scope denial and indexing
 checks on 20 October 2026; see the [deployment proof](../writeback-deployment-proof.md).
 The earlier prototype failure is recorded in the [handoff](../writeback-local-handoff.md).
-Activity-log activation needs separate authorisation; `update_note` and owner
+Activity-log activation needs separate authorisation; canonical updates and owner
 review remain proposed work in the current implementation.
 
 ## Shared rules
@@ -32,7 +32,7 @@ review remain proposed work in the current implementation.
 | `search_kb` | query, bounded limit, strategy | `kb:read` plus visible paths | Permitted paths/excerpts, authority tiers, indexed source revisions, snapshot/contract IDs, freshness and pending-change indication |
 | `fetch_note` | normalized exact path, optional permitted revision, bounded max_chars | `kb:read` for current/historical access as applicable | Markdown, revision, truncation, authority and separate indexed/current status; works without a fresh index |
 | `capture_learning` | operation_id, exact granted raw-capture destination, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
-| `update_note` | operation_id, exact path, expected_revision, bounded proposed patch and provenance | `kb:update` for path | Conditional saved revision or inspectable proposal; never an unconditional overwrite |
+| `update_note` | operation_id, exact path, expected_revision, unique old_text/new_text passage, origin, date, evidence_links, inference_labels | `kb:update` and read access for path | Conditional saved revision for ordinary notes; protected content returns review_required/forbidden |
 | `get_change_status` | authorized operation_id | Access to the originating operation/path | Review, persistence, activity-audit and indexing states, receipt if committed, bounded failure/retry information |
 | `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes; owner-only access management URL, 90/365-day choices and renewal indication; no note content or other clients' grants |
 
@@ -76,7 +76,10 @@ Both request forms share the same operation digest and persistence receipt.
   Lexical duplicate checks use the snapshot's text without requiring the current
   query embedding contract; vector/hybrid requests still enforce compatibility.
 - `expected_revision` is an opaque revision from a previous fetch. The writer
-  verifies its corresponding storage precondition; clients do not invent it.
+  verifies the current S3 version and uses its ETag for the conditional PUT;
+  clients do not invent it. S3 compares content ETags, not version IDs: an external
+  identical-byte rewrite during the read/PUT race is content-equivalent, not an
+  exact version-ID transaction. See [note-updates.md](../note-updates.md).
 - A `persisted` result includes committed Markdown path/revision. Merely queuing
   a write returns `pending`, never `saved`.
 - A successful Markdown save can have `indexing: pending` and reconciling audit

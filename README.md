@@ -92,6 +92,7 @@ retrieval behaviour and bilingual quality, rather than identical rankings.
 | `search_kb` | Search with `lexical`, `vector` or the default `hybrid` strategy | `kb:read` and permitted note paths |
 | `fetch_note` | Fetch current Markdown from S3 independently of indexing | `kb:read` and permitted note paths |
 | `capture_learning` | Create a new raw Markdown learning with provenance and an operation ID | Separate `kb:capture` grant for an exact raw-capture destination |
+| `update_note` | Replace one exact passage in an existing ordinary note using `expected_revision` | Separate `kb:update` + read grant; protected knowledge requires review |
 | `get_change_status` | Check persistence and indexing status for a capture operation | The authenticated owner/client that owns the operation |
 | `get_access_status` | Show the caller's verified client ID, owner binding and grant state | Any authenticated client; reads no notes |
 
@@ -170,12 +171,18 @@ includes an owner access link. `get_access_status` also returns
 Open that link, sign in with the configured Google owner account, check the
 client ID/name/callback and choose **Approve / renew access**. Choose read-only
 or read plus new learning notes, for 90 days or **one year (365 days)**. Retry
-the original MCP operation after approval, retaining its operation ID.
+the original MCP operation after approval, retaining its operation ID. To edit
+existing notes, choose **Read, create and update ordinary notes**; this adds
+`kb:update` for Ideas, Projects, Areas, Resources, Personal Facts and Templates.
+Fetch the cloud note's `revision`, then pass it unchanged as `expected_revision`
+with an exact, unique `old_text` / `new_text` replacement. Other text is preserved.
 
 The same page supports revocation and renewal, including after expiry. Existing
 grants keep their current expiry until renewed. MCP tokens cannot approve
 grants, and grants do not silently extend. Capture remains restricted to
-`Resources/_Review/AI Learning/`, with no existing-note edits or deletions.
+`Resources/_Review/AI Learning/`. Updates are a separate explicit permission;
+Wiki, policy/AGENTS notes, verified knowledge and source snapshots remain
+protected, and no file deletion is enabled. See [ordinary note updates](specs/006-cloud-kb-mcp/note-updates.md).
 This flow needs no AWS credentials or operator intervention.
 
 The operator-only [`tools/grant_mcp_client.py`](tools/grant_mcp_client.py) remains
