@@ -52,6 +52,12 @@ The owner configures existing taxonomy destinations for captures/proposals;
 client-supplied paths cannot widen them. All source material remains unmodified
 unless an explicitly permitted maintained-note operation applies.
 
+Existing registered connectors may keep sending `learning`, `date` and
+`evidence_links`; these are aliases for `markdown`, `created_date` and `evidence`.
+Conflicting values are rejected. The legacy destination `learning` resolves only
+to `Resources/_Review/AI Learning/` and still requires that exact granted prefix.
+Both request forms share the same operation digest and persistence receipt.
+
 ## Persistence and retries
 
 - Scope operation IDs by principal/client; replay of identical content returns

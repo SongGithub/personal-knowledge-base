@@ -226,10 +226,24 @@ class CloudHTTPTests(unittest.TestCase):
             with patch.object(search, "search", side_effect=RuntimeError("index_unavailable")):
                 replay = (await client.call_tool("capture_learning", capture_arguments)).data
                 self.assertTrue(replay["replayed"])
+                legacy_arguments = {key: value for key, value in capture_arguments.items()
+                                    if key not in {"markdown", "created_date", "evidence"}}
+                legacy_arguments.update(destination="learning", learning=capture_arguments["markdown"],
+                                        date=capture_arguments["created_date"], evidence_links=[])
+                legacy = (await client.call_tool("capture_learning", legacy_arguments)).data
+                self.assertTrue(legacy["replayed"])
+                self.assertEqual(legacy["path"], capture["path"])
+                for conflicting in ({"markdown": "Different body"}, {"created_date": "2026-10-20"},
+                                    {"evidence": ["https://example.invalid/different"]}):
+                    with self.subTest(conflicting=conflicting), self.assertRaises(ToolError):
+                        await client.call_tool("capture_learning", {**legacy_arguments, **conflicting})
             status = (await client.call_tool("get_change_status", {
                 "operation_id": "synthetic-capture-001"})).data
             self.assertEqual(status["path"], capture["path"])
             self.assertEqual(status["persistence"], "persisted")
+            table.grants["synthetic-client"]["CapturePrefixes"] = ["Ideas/"]
+            with self.assertRaises(ToolError):
+                await client.call_tool("capture_learning", legacy_arguments)
         async with mcp_client(token(client_id="synthetic-unregistered")) as client:
             with self.assertRaises(ToolError) as raised:
                 await client.call_tool("fetch_note", {"path": PATH})

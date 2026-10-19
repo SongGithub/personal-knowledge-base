@@ -20,6 +20,12 @@ from cloud_kb.storage import S3Notes, normalize_path, permitted
 from cloud_kb.writer import LearningWriter
 
 
+def capture_value(current, legacy, name):
+    if current is not None and legacy is not None and current != legacy:
+        raise ToolError("conflicting_" + name)
+    return current if current is not None else legacy
+
+
 def create_app(*, auth_provider, gate, notes, search, base_url, writer=None):
     if auth_provider is None:
         raise ValueError("An authentication provider is required")
@@ -54,19 +60,30 @@ def create_app(*, auth_provider, gate, notes, search, base_url, writer=None):
             raise ToolError(str(error)) from None
 
     @mcp.tool(annotations=capture_annotations)
-    async def capture_learning(operation_id: str, destination: str, title: str,
-                               markdown: str, origin: str, created_date: str,
+    async def capture_learning(operation_id: str, destination: str, title: str, origin: str,
+                               markdown: str | None = None, created_date: str | None = None,
                                evidence: list[str] | None = None,
-                               inference_labels: list[str] | None = None) -> dict:
-        """Persist a new unverified Markdown note under an exact granted raw-capture destination."""
+                               inference_labels: list[str] | None = None,
+                               learning: str | None = None, date: str | None = None,
+                               evidence_links: list[str] | None = None) -> dict:
+        """Persist a new unverified note under an exact granted raw-capture destination.
+
+        Existing connectors may use learning/date/evidence_links. The legacy
+        destination 'learning' requires the exact granted AI Learning review folder.
+        """
         if writer is None:
             raise ToolError("write_unavailable")
         token = get_access_token()
         principal, client_id = await asyncio.to_thread(gate.operation_identity, token)
         prefixes = await asyncio.to_thread(gate.capture_prefixes, token)
+        if destination == "learning":
+            destination = "Resources/_Review/AI Learning/"
         if destination not in prefixes:
             raise ToolError("forbidden")
         try:
+            markdown = capture_value(markdown, learning, "markdown")
+            created_date = capture_value(created_date, date, "created_date")
+            evidence = capture_value(evidence, evidence_links, "evidence")
             try:
                 await asyncio.to_thread(writer.status, principal=principal,
                                         client_id=client_id, operation_id=operation_id, check_index=False)
