@@ -172,6 +172,63 @@ document re-embedding and a new snapshot namespace; dimensions alone do not prov
 compatibility. Both query and document paths must use compatible model/version,
 input types, tokenization, pooling and normalization.
 
+### Cloud hybrid-search execution (2026-10-19 design update)
+
+The S3 copy is source data, not a searchable index. The deployed mock snapshot
+uses `lexical-sqlite-v1`, contains only the synthetic fixture, and rejects
+`vector`/`hybrid`. Treat that as a migration baseline, not cloud parity.
+
+For the initial bulk build, an AWS worker inventories `notes/*.md`, reads only
+current private S3 objects, computes SHA-256 and source VersionId, applies the
+local `paragraph-1500-v1` chunker and authority rules, and generates embeddings
+for each chunk. On subsequent S3 create/delete notifications, SQS invokes the
+worker; it reconciles current S3 state rather than trusting event order, reuses
+vectors for unchanged path+digest+embedding contract, and removes deleted notes.
+The queue/worker must coalesce or serialize index publication to avoid competing
+SQLite writers. A full rebuild is required when the model or chunking contract
+changes. Bulk builds that exceed Lambda's measured limits use an on-demand
+CodeBuild/Batch job, with the same publisher and no permanent compute instance.
+
+The worker writes `notes(path,tier,sha256,source_revision)`,
+`chunks(path,ordinal,text,vector)` and versioned metadata to a private SQLite
+working file. It checkpoints/backups, validates row/vector counts and integrity,
+uploads an immutable checksum-addressed snapshot plus manifest to the private
+index bucket, then conditionally advances the DynamoDB active pointer. The
+previous snapshot remains usable until that last step succeeds. No Markdown,
+vector or private manifest enters Git, a Lambda ZIP or public CI artifacts.
+
+For each `search_kb` invocation, the MCP Lambda validates the grant and pins one
+active descriptor. `lexical` performs the local BM25-style token scoring,
+including Chinese bigrams and filename terms. `vector` embeds the query with the
+matching cloud model, then scores the stored normalized vectors by dot product
+(cosine). `hybrid` combines both rankings using the local 0.25 lexical / 0.75
+vector reciprocal-rank fusion and near-tie authority ordering. The first live
+synthetic comparison found that the local fusion pushed a correct cross-language
+vector top hit below rank three. The cloud rule therefore preserves vector rank
+one within the hybrid top three while leaving the fused top hit untouched; this
+is a measured quality adjustment, not an identical-ranking claim. Query embedding
+is one managed inference call per semantic search; document embedding happens
+only on initial or changed-note ingestion. Before returning any candidate,
+recheck current grant, source existence/revision and policy. Fetch remains a
+direct S3 read independent of index freshness.
+
+The first candidate is Cohere Embed Multilingual v3 through Bedrock in Sydney:
+`search_document` for chunks and `search_query` for queries. This is a candidate,
+not consent to send private text. Pin the exact model ID, dimensions, input modes,
+normalization, chunker, vector representation and region in `EmbeddingContract`.
+Compare it on bilingual synthetic cases and approved private evaluation queries
+against the local MCP before activating the private index. Cohere Embed v4 from
+Sydney currently uses global cross-region routing, so its data boundary differs;
+do not silently substitute it. Exact local bge-m3 rankings would require serving
+the same encoder in the cloud instead of switching embedding spaces.
+
+The published cloud index must cover the S3 Markdown corpus before calling this
+like-for-like. Explicit acceptance requires lexical/vector/hybrid, default
+hybrid, English/Chinese queries, source/authority metadata, safe direct fetch,
+incremental refresh, deletion/revocation protection, and operation while the
+Mac is offline. Record actual differences in ranking; function parity is not a
+promise of identical scores from different embedding models.
+
 Local oMLX can instead poll approved work, download changed objects and publish
 derived artifacts, but this hybrid option delays indexing while the Mac is
 offline and does not solve query-time embedding availability. It is an optional

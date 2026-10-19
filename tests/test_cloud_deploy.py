@@ -58,7 +58,8 @@ class DeploymentTests(unittest.TestCase):
         cfn.describe_stacks.side_effect = ClientError({"Error": {"Code": "ValidationError", "Message": "Stack does not exist"}}, "DescribeStacks")
         trust = {"CloudFormationExecutionRoleArn": "scoped-role", "AuthSecretArn": "named-secret", "HttpApiId": "mockapi"}
         foundation = {"AuthSecretArn": "named-secret", "ReleaseBucketName": "code-only", "DataBucketName": "notes",
-                      "IndexBucketName": "indexes", "ControlTableName": "control", "ApiExecutionRoleArn": "api-runtime"}
+                      "IndexBucketName": "indexes", "ControlTableName": "control", "ApiExecutionRoleArn": "api-runtime",
+                      "IngestionExecutionRoleArn": "ingestion-runtime", "IngestionQueueArn": "synthetic-queue-arn"}
         endpoint = "https://mockapi.execute-api.ap-southeast-2.amazonaws.com/mcp"
         health = Mock()
         health.__enter__ = Mock(return_value=health)

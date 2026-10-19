@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import uuid
@@ -104,6 +105,9 @@ def deploy(session, configuration, release):
         "ReleaseBucket": foundation["ReleaseBucketName"], "ReleaseKey": key, "ReleaseVersion": version,
         "VaultBucket": foundation["DataBucketName"], "IndexBucket": foundation["IndexBucketName"],
         "ControlTable": foundation["ControlTableName"], "ApiExecutionRoleArn": foundation["ApiExecutionRoleArn"],
+        "IngestionExecutionRoleArn": foundation["IngestionExecutionRoleArn"],
+        "IngestionQueueArn": foundation["IngestionQueueArn"],
+        "EnableIngestion": os.environ.get("PKB_ENABLE_INGESTION", "false"),
         "AuthSecretArn": configuration.auth_secret, "OwnerGoogleSubject": configuration.owner_sub,
         "ClientRedirectUris": configuration.redirects,
     }
@@ -157,8 +161,25 @@ def deploy(session, configuration, release):
     except HTTPError as error:
         if error.code != 401 or not error.headers.get("WWW-Authenticate", "").startswith("Bearer"):
             raise RuntimeError("Deployed MCP did not reach its authentication boundary") from None
+    if os.environ.get("PKB_ENABLE_INGESTION") == "true":
+        queue = session.client("sqs")
+        run_id = uuid.uuid4().hex
+        queue.send_message(QueueUrl=foundation["IngestionQueueUrl"],
+                           MessageBody=json.dumps({"kind": "reconcile", "source": "pipeline", "run_id": run_id}))
+        table = session.resource("dynamodb").Table(foundation["ControlTableName"])
+        deadline = time.monotonic() + 720
+        while time.monotonic() < deadline:
+            item = table.get_item(Key={"PK": "JOB#" + run_id, "SK": "STATUS"},
+                                  ConsistentRead=True).get("Item", {})
+            if item.get("Status") in {"published", "unchanged"} and item.get("SnapshotId"):
+                break
+            time.sleep(10)
+        else:
+            raise RuntimeError("Cloud hybrid index did not become active within 12 minutes")
     return {"deployment": "complete", "release_sha256": digest, "unauthenticated_denied": True,
-            "mock_seeded": configuration.seed_mock, "google_authenticated_read": "pending_owner_verification"}
+            "mock_seeded": configuration.seed_mock,
+            "cloud_index": "hybrid-active" if os.environ.get("PKB_ENABLE_INGESTION") == "true" else "not_checked",
+            "google_authenticated_read": "pending_owner_verification"}
 
 
 if __name__ == "__main__":

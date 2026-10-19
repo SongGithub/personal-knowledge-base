@@ -83,7 +83,7 @@ jobs:
           "$RUNNER_TEMP/pkb-cloud-check/bin/python" -m pip install --only-binary=:all: --disable-pip-version-check -r requirements-cloud-test.txt -c "$RUNNER_TEMP/pkb-cloud-versions.txt"
           echo "$RUNNER_TEMP/pkb-cloud-check/bin" >> "$GITHUB_PATH"
       - name: Exercise mock Markdown and access failures without AWS credentials
-        run: python3 -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator -v
+        run: python3 -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_hybrid -v
       - name: Build code-only Lambda release from hashed Linux wheels
         run: python3 tools/build_cloud_release.py --output "$RUNNER_TEMP/pkb-cloud-release.zip"
 

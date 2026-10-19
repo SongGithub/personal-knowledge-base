@@ -20,7 +20,7 @@ class NativePipelineTests(unittest.TestCase):
         project = template["Resources"]["NativePipeline"]["Properties"]
         self.assertFalse(project["Environment"]["PrivilegedMode"])
         self.assertEqual(project["ConcurrentBuildLimit"], 1)
-        self.assertEqual(project["TimeoutInMinutes"], 15)
+        self.assertEqual(project["TimeoutInMinutes"], 30)
         self.assertEqual(project["SourceVersion"], {"Ref": "SourceCommit"})
         trust = template["Resources"]["NativeBuildRole"]["Properties"]["AssumeRolePolicyDocument"]["Statement"][0]
         self.assertEqual(trust["Principal"], {"Service": "codebuild.amazonaws.com"})
