@@ -34,7 +34,7 @@ review remain proposed work in the current implementation.
 | `capture_learning` | operation_id, exact granted raw-capture destination, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
 | `update_note` | operation_id, exact path, expected_revision, bounded proposed patch and provenance | `kb:update` for path | Conditional saved revision or inspectable proposal; never an unconditional overwrite |
 | `get_change_status` | authorized operation_id | Access to the originating operation/path | Review, persistence, activity-audit and indexing states, receipt if committed, bounded failure/retry information |
-| `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes; no note content or other clients' grants |
+| `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes; owner-only access management URL, 90/365-day choices and renewal indication; no note content or other clients' grants |
 
 Bounds: query <=2,000 characters; search limit 1–10; fetch max_chars 1–20,000;
 capture title <=200 characters, Markdown <=12,000 characters, origin <=500,
@@ -45,8 +45,16 @@ Search tokens do not acquire mutation rights. Captures can write only below
 an exact owner-granted prefix under `Ideas/` or
 `Resources/_Review/AI Learning/`; the runtime role and writer enforce those
 trees. Other Resources folders, maintained notes and canonical content are
-outside this capture boundary. Provisioned grants may last at most 90 days;
-the operator must use the duration the owner actually approved.
+outside this capture boundary. The owner browser page offers 90 or 365 days,
+defaulting to 365, and can renew or revoke the exact client grant. Existing
+grants keep their approved expiry until explicitly renewed. The legacy
+operator provisioning tool retains its 90-day maximum.
+
+Missing, expired, revoked and insufficient-scope errors include a recovery URL.
+`access_management.renewal_required` is true for absent/revoked grants or grants
+expiring in the next 30 days. The URL requires a separate Google owner browser
+session and explicit approval; neither calling a tool nor following the link
+grants access. Retry captures using the original operation ID after approval.
 
 `capture_learning` searches for existing material before creating a duplicate.
 The owner configures existing taxonomy destinations for captures/proposals;

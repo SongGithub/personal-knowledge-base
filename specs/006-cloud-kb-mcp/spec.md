@@ -156,6 +156,13 @@ settings, exercise rollback/restore and confirm restricted deployment permission
 - **FR-004**: Owner binding, client grants, revocations and authorization secrets
   MUST be durable and independent of disposable search indexes. Rebuilding an
   index MUST NOT change permissions. Revocation MUST apply within five minutes.
+- **FR-004a** (owner request, 2026-10-20): Missing/expired client grants MUST
+  return an owner self-service approval/renewal URL. A separate Google owner
+  browser session MUST approve the exact registered client, scopes and duration.
+  Offer 90 or 365 days (default 365), renewal and revocation, with no silent
+  extension or transfer to a new registration. MCP credentials MUST NOT approve
+  grants. Retain the approved new-note capture folder and deny existing-note
+  edits. See [self-service-access.md](self-service-access.md).
 - **FR-005**: Writes MUST include origin/date, evidence links and explicit AI
   inference labels where applicable. Capture destinations MUST follow the owner's
   taxonomy and be configured before use; duplicate search MUST precede creation.
