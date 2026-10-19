@@ -47,12 +47,38 @@ default, automated security/browser checks and deployment in this conversation.
   page `Referrer-Policy: same-origin` preserves same-site POST provenance while
   suppressing cross-origin referrers. Origin/CSRF checks remain enforced.
 - This simulated Google flow is not evidence of a real owner login or approval.
-  Deployment and real owner sign-in evidence remain pending below.
+  Real owner sign-in acceptance remains pending below.
 - Initial live sign-in verification caught a pinned-library mismatch: FastMCP's
   upstream client is token-only and does not expose Authlib's authorization-URL
   helper. Version 0.2.1 builds Google's standard URL/PKCE challenge directly,
   requests online identity access only, and adds a real-provider start-route
   regression check plus exact challenge/verifier matching. All 92 checks pass.
+
+### Live rollout: Cloud KB 0.2.1
+
+- Deployed source: `d9c0f4dbdd704fcdc7357bf4a93541f62e670e26`.
+- Managed build: `pkb-dev-pipeline:5560d3d5-b1b8-4a3a-9f73-a102700eee41`,
+  succeeded. GitHub infrastructure validation and synthetic HTTP/Lambda checks
+  also passed for this source.
+- Release SHA-256:
+  `2800924f602331bc8d8d5b1de1225bad3f3b82ab91bc6679c19f20b50a59449a`.
+  Both deployed function hashes match; every bundled `cloud_kb/*.py` matches
+  the reviewed source. All three stacks completed their updates.
+- Google owner binding, callback configuration, secret version and runtime
+  configuration were preserved. Both existing client grants and their original
+  expiry/scope values were independently read back unchanged after rollout.
+- Live `/healthz` reports `0.2.1`; the access page requires Google sign-in.
+  Starting owner sign-in returns a redirect to Google's authorization endpoint
+  with the existing callback, PKCE S256 and a Secure/HttpOnly/SameSite browser
+  cookie. Anonymous grant decisions return 403; anonymous MCP returns 401.
+- No model/index/ranking configuration changed. The existing bootstrap's
+  configuration comparison skipped paid model benchmarking for this unrelated
+  release; deterministic retrieval/benchmark checks still ran. No IAM policy,
+  capture tree or existing-note editing permission was expanded.
+- **First-use acceptance still pending**: the owner must complete the real
+  Google browser sign-in and explicit decision, then retry from that client.
+  Live redirects and synthetic approval tests do not prove that step. No
+  existing production grant has been renewed automatically.
 
 ## Sources
 
