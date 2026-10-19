@@ -91,10 +91,11 @@ async def verify(url, *, aws_env_file=None, owner_file=None, authorization_file=
             from tools.aws_session import session_from_file
             await asyncio.to_thread(provision_mock_grant, session_from_file(aws_env_file),
                                     url, owner_file, auth.context.client_info.client_id)
-        search = (await client.call_tool("search_kb", {"query": "citrus-lantern-742", "strategy": "lexical"})).data
-        matches = [item for item in search["results"] if item["path"] == NOTE]
-        if not matches or matches[0]["freshness"] != "current":
-            raise RuntimeError("Synthetic fixture is missing or stale in retrieval")
+        for strategy in ("lexical", "vector", "hybrid"):
+            search = (await client.call_tool("search_kb", {"query": "citrus-lantern-742", "strategy": strategy})).data
+            matches = [item for item in search["results"] if item["path"] == NOTE]
+            if search.get("contract") != "hybrid-sqlite-v1" or not matches or matches[0]["freshness"] != "current":
+                raise RuntimeError("Synthetic fixture is missing or stale in " + strategy + " retrieval")
         fetched = (await client.call_tool("fetch_note", {"path": NOTE, "max_chars": 20_000})).data
         expected = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
         if (fetched["sha256"] != expected or fetched["truncated"] or
@@ -102,7 +103,7 @@ async def verify(url, *, aws_env_file=None, owner_file=None, authorization_file=
             raise RuntimeError("Fetched Markdown does not match the synthetic source")
     # No URLs, owner/client identifiers, credentials or private excerpts in output.
     print(json.dumps({"status": "passed", "transport": "HTTPS MCP", "auth": "OAuth",
-                      "unauthenticated_denied": True, "search_and_fetch": True,
+                      "unauthenticated_denied": True, "lexical_vector_hybrid_and_fetch": True,
                       "mock_sha256": expected, "seconds_including_auth": round(time.monotonic() - started, 3)}))
 
 

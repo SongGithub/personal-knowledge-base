@@ -128,8 +128,8 @@ provisioning; real Google consent and the T033 proof passed on 2026-10-19.
 - [x] T037 [US1] Implement a versioned cloud snapshot reader with the local lexical, vector and hybrid ranking contract and default hybrid in `cloud_kb/search.py` and `cloud_kb/api.py`.
 - [x] T038 [US3] Implement the approved Bedrock document/query embedding adapter and explicit compatibility metadata in `cloud_kb/embeddings.py` and `specs/006-cloud-kb-mcp/model-decision.md`.
 - [x] T039 [US3] Implement S3 Markdown inventory, changed-chunk reuse, deletion reconciliation, consistent SQLite publication and conditional active-pointer update in `cloud_kb/ingestion.py`.
-- [ ] T040 [US3] Connect S3 notifications, SQS, ingestion Lambda/role and scoped Bedrock invocation through `infra/foundation.template.json` and `infra/application.template.json`.
-- [ ] T041 [US3] Add a one-time private bulk index build through the reviewed pipeline and synthetic bilingual parity checks, then activate only after user-approved provider/data boundary and record evidence in `specs/006-cloud-kb-mcp/acceptance-results.md`.
+- [x] T040 [US3] Connect S3 notifications, SQS, ingestion Lambda/role and scoped Bedrock invocation through `infra/foundation.template.json` and `infra/application.template.json` (deployed 2026-10-19).
+- [x] T041 [US3] Add a one-time private bulk index build through the reviewed pipeline and synthetic bilingual parity checks, then activate only after user-approved provider/data boundary and record evidence in `specs/006-cloud-kb-mcp/acceptance-results.md` (deployed 2026-10-19).
 - [ ] T042 [US1] Exercise deployed authenticated lexical/vector/hybrid search and fetch, freshness/deletion safety and Mac-independent serving; record actual client and bilingual results in `specs/006-cloud-kb-mcp/acceptance-results.md`.
 - [x] T043 [US3] Add deterministic hybrid/index checks to `.github/workflows/infra.yml` and a real synthetic bilingual Bedrock quality gate before deployment in `infra/buildspec.yml` and `tools/benchmark_cloud_embeddings.py`.
 
