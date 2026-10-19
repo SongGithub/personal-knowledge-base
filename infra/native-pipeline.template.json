@@ -92,6 +92,9 @@
     "HasCloudflareDnsToken": {
       "Fn::Not": [{"Fn::Equals": [{"Ref": "CloudflareDnsTokenSecretArn"}, "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns"]}]
     },
+    "HasCustomDomain": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "CustomDomainName"}, ""]}]
+    },
     "AllowMockSeeding": {
       "Fn::And": [
         {
@@ -871,6 +874,18 @@
                       "Effect": "Allow",
                       "Action": "secretsmanager:GetSecretValue",
                       "Resource": {"Ref": "CloudflareDnsTokenSecretArn"}
+                    },
+                    {"Ref": "AWS::NoValue"}
+                  ]
+                },
+                {
+                  "Fn::If": [
+                    "HasCustomDomain",
+                    {
+                      "Sid": "DescribeConfiguredCustomDomainCertificate",
+                      "Effect": "Allow",
+                      "Action": "acm:DescribeCertificate",
+                      "Resource": {"Ref": "CustomDomainCertificateArn"}
                     },
                     {"Ref": "AWS::NoValue"}
                   ]
