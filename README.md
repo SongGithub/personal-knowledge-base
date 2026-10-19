@@ -103,8 +103,8 @@ an operation ID with different content is rejected.
 The local implementation accepts granted destinations under `Ideas/` or
 `Resources/_Review/AI Learning/`. The latter matches the owner's approved
 learning-review folder. A client must supply its exact granted prefix; support
-for a folder does not grant access to it. Grant tooling supports up to 90 days
-when the owner has approved that duration.
+for a folder does not grant access to it. The owner access page offers 90 days
+or one year (365 days), defaulting to one year, with explicit renewal/revocation.
 
 Persistence and indexing are separate outcomes. A saved note can be fetched
 before it appears in search. S3 events queue background ingestion; the worker
@@ -162,16 +162,31 @@ allows its local port to vary while matching the host and path. Other clients
 must use their own approved callbacks and complete OAuth onboarding. Do not
 assume one desktop login verifies ChatGPT web or another client.
 
-The owner can provision bounded read/capture grants with
-[`tools/grant_mcp_client.py`](tools/grant_mcp_client.py), using an authorised AWS
-operator session and the verified owner/client identity. AI clients receive MCP
-credentials rather than AWS credentials or machine access.
+### Approve, renew or revoke access yourself
+
+When a KB grant is missing, expired, revoked or lacks a scope, the tool error
+includes an owner access link. `get_access_status` also returns
+`access_management.url`, expiry and `renewal_required` (within 30 days of expiry).
+Open that link, sign in with the configured Google owner account, check the
+client ID/name/callback and choose **Approve / renew access**. Choose read-only
+or read plus new learning notes, for 90 days or **one year (365 days)**. Retry
+the original MCP operation after approval, retaining its operation ID.
+
+The same page supports revocation and renewal, including after expiry. Existing
+grants keep their current expiry until renewed. MCP tokens cannot approve
+grants, and grants do not silently extend. Capture remains restricted to
+`Resources/_Review/AI Learning/`, with no existing-note edits or deletions.
+This flow needs no AWS credentials or operator intervention.
+
+The operator-only [`tools/grant_mcp_client.py`](tools/grant_mcp_client.py) remains
+available for bounded recovery (up to 90 days). AI clients receive MCP
+credentials rather than AWS credentials or machine access. See the
+[self-service access design and delivery record](specs/006-cloud-kb-mcp/self-service-access.md).
 
 Grants are bound to the OAuth **client ID**, not just the owner. A client that
-registers again receives a new client ID and needs a new grant; repeating the
-Google consent screen does not create or move a grant. If a tool returns
-`forbidden: grant_required; no KB grant exists for OAuth client <id>`, grant that
-ID. Call `get_access_status` to see the client ID, whether the signed-in account
+registers again receives a new client ID and needs a new owner decision; an
+existing grant never transfers based on a matching client name. Complete the
+owner access page for the new ID. Call `get_access_status` to see the client ID, whether the signed-in account
 is the owner and whether a live grant exists. Other `forbidden` reasons
 (`owner_mismatch`, `grant_revoked`, `grant_expired`, `missing_scope`,
 `malformed_grant`, `identity_unavailable`) are reported separately so the cause

@@ -1,5 +1,11 @@
 # Tasks: Cloud KB MCP and Learning Writeback
 
+## Owner self-service access (2026-10-20)
+
+- [x] T054 Add Google owner browser approval, explicit renewal/revocation and 90/365-day grants, keeping existing-note edits unavailable, in `cloud_kb/access.py` and `cloud_kb/grants.py`.
+- [x] T055 Add recovery links, advance renewal status, durable encrypted browser state and conditional atomic decision/audit writes.
+- [ ] T056 Complete synthetic security checks, browser verification, publish/deploy and record live evidence in `self-service-access.md`.
+
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
 [data-model.md](data-model.md), [contracts](contracts/mcp-tools.md).  
 **Created**: 2026-10-17.  

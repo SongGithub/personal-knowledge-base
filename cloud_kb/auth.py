@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import time
+from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet
 from fastmcp.exceptions import ToolError
@@ -74,27 +75,53 @@ class BoundGoogleProvider(GoogleProvider):
             return None
         return verified.model_copy(update={"client_id": client_id})
 
+    def get_routes(self, mcp_path=None):
+        routes = super().get_routes(mcp_path)
+        access = getattr(self, "owner_access", None)
+        return routes + access.routes() if access is not None else routes
+
+    async def _handle_idp_callback(self, request):
+        from cloud_kb.access import STATE_PREFIX
+        if request.query_params.get("state", "").startswith(STATE_PREFIX):
+            return await self.owner_access.handle(request)
+        return await super()._handle_idp_callback(request)
+
 
 def google_provider(settings, secret, table):
-    return BoundGoogleProvider(
+    from cloud_kb.access import OwnerAccess
+    store = FernetEncryptionWrapper(
+        key_value=DynamoOAuthStore(table), fernet=Fernet(secret["storage_encryption_key"].encode()),
+    )
+    provider = BoundGoogleProvider(
         client_id=secret["google_client_id"], client_secret=secret["google_client_secret"],
         base_url=settings.base_url,
         required_scopes=["openid", "https://www.googleapis.com/auth/userinfo.email"],
         jwt_signing_key=secret["jwt_signing_key"],
-        client_storage=FernetEncryptionWrapper(
-            key_value=DynamoOAuthStore(table), fernet=Fernet(secret["storage_encryption_key"].encode()),
-        ),
+        client_storage=store,
         allowed_client_redirect_uris=list(settings.client_redirect_uris),
         require_authorization_consent=True, enable_cimd=False,
         cache_ttl_seconds=0, fastmcp_access_token_expiry_seconds=300,
     )
+    provider.owner_access = OwnerAccess(provider=provider, store=store, table=table,
+                                      owner_sub=settings.owner_sub, base_url=settings.base_url,
+                                      google_client_id=secret["google_client_id"])
+    return provider
 
 
 class GrantGate:
     """Deny access unless the verified owner holds a live grant for this client."""
 
-    def __init__(self, table, owner_sub):
-        self.table, self.owner_sub = table, owner_sub
+    def __init__(self, table, owner_sub, base_url=None):
+        self.table, self.owner_sub, self.base_url = table, owner_sub, base_url
+
+    def access_url(self, client_id):
+        if self.base_url and client_id:
+            return self.base_url.rstrip("/") + "/access?" + urlencode({"client_id": client_id})
+        return None
+
+    def recovery(self, client_id):
+        url = self.access_url(client_id)
+        return "; owner approval/renewal: " + url if url else ""
 
     @staticmethod
     def _subject(token):
@@ -124,15 +151,15 @@ class GrantGate:
             # re-registers gets a new client_id, so grants do not carry over.
             raise ToolError(
                 "forbidden: grant_required; no KB grant exists for OAuth client "
-                + token.client_id)
+                + token.client_id + self.recovery(token.client_id))
         if grant.get("Revoked", True):
             raise ToolError(
                 "forbidden: grant_revoked; the KB grant for OAuth client "
-                + token.client_id + " is revoked")
+                + token.client_id + " is revoked" + self.recovery(token.client_id))
         if float(grant.get("ExpiresAt", 0)) <= time.time():
             raise ToolError(
                 "forbidden: grant_expired; the KB grant for OAuth client "
-                + token.client_id + " has expired")
+                + token.client_id + " has expired" + self.recovery(token.client_id))
         return grant
 
     def status(self, token):
@@ -150,6 +177,10 @@ class GrantGate:
         # callers and never disclose whether some other client is granted.
         if not result["client_id"] or not result["owner"]:
             return result
+        if self.base_url:
+            result["access_management"] = {"url": self.access_url(result["client_id"]),
+                                           "default_days": 365, "available_days": [90, 365],
+                                           "renewal_required": True}
         grant = self.table.get_item(
             Key={"PK": "GRANT#" + self.owner_sub, "SK": "CLIENT#" + token.client_id},
             ConsistentRead=True,
@@ -161,6 +192,10 @@ class GrantGate:
                 "expires_at": int(float(grant["ExpiresAt"])) if "ExpiresAt" in grant else None,
                 "scopes": sorted(grant.get("Scopes", [])),
             }
+            if self.base_url:
+                result["access_management"]["renewal_required"] = (
+                    bool(grant.get("Revoked", True)) or
+                    float(grant.get("ExpiresAt", 0)) <= time.time() + 30 * 86400)
         return result
 
     def read_prefixes(self, token):
@@ -168,7 +203,7 @@ class GrantGate:
         if "kb:read" not in grant.get("Scopes", []):
             raise ToolError(
                 "forbidden: missing_scope; the KB grant for OAuth client "
-                + token.client_id + " does not include kb:read")
+                + token.client_id + " does not include kb:read" + self.recovery(token.client_id))
         prefixes = grant.get("Prefixes", [])
         if not isinstance(prefixes, list) or not all(isinstance(prefix, str) for prefix in prefixes):
             raise ToolError(
@@ -181,7 +216,7 @@ class GrantGate:
         if "kb:capture" not in grant.get("Scopes", []):
             raise ToolError(
                 "forbidden: missing_scope; the KB grant for OAuth client "
-                + token.client_id + " does not include kb:capture")
+                + token.client_id + " does not include kb:capture" + self.recovery(token.client_id))
         prefixes = grant.get("CapturePrefixes", [])
         if not isinstance(prefixes, list) or not prefixes:
             raise ToolError(
@@ -201,5 +236,5 @@ class GrantGate:
         if "kb:capture" not in grant.get("Scopes", []):
             raise ToolError(
                 "forbidden: missing_scope; the KB grant for OAuth client "
-                + token.client_id + " does not include kb:capture")
+                + token.client_id + " does not include kb:capture" + self.recovery(token.client_id))
         return self.owner_sub, token.client_id
