@@ -9,7 +9,7 @@ from cryptography.fernet import Fernet
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.google import GoogleProvider
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
-from cloud_kb.storage import validate_capture_prefix
+from cloud_kb.storage import validate_capture_prefix, validate_update_prefix
 
 
 class DynamoOAuthStore:
@@ -231,10 +231,25 @@ class GrantGate:
                 + token.client_id + " has invalid capture prefixes") from None
         return prefixes
 
-    def operation_identity(self, token):
+    def update_prefixes(self, token):
         grant = self._grant(token)
-        if "kb:capture" not in grant.get("Scopes", []):
+        if "kb:update" not in grant.get("Scopes", []):
+            raise ToolError("forbidden: missing_scope; kb:update requires owner approval" + self.recovery(token.client_id))
+        prefixes = grant.get("UpdatePrefixes", [])
+        try:
+            if not isinstance(prefixes, list) or not prefixes:
+                raise ValueError()
+            for prefix in prefixes:
+                validate_update_prefix(prefix)
+        except ValueError:
+            raise ToolError("forbidden: malformed_grant; invalid update prefixes") from None
+        return prefixes
+
+    def operation_identity(self, token, scope="kb:capture"):
+        grant = self._grant(token)
+        required = {"kb:capture", "kb:update"} if scope == "any-write" else {scope}
+        if not required.intersection(grant.get("Scopes", [])):
             raise ToolError(
                 "forbidden: missing_scope; the KB grant for OAuth client "
-                + token.client_id + " does not include kb:capture" + self.recovery(token.client_id))
+                + token.client_id + " does not include " + scope + self.recovery(token.client_id))
         return self.owner_sub, token.client_id

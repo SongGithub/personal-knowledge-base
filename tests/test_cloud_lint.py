@@ -44,6 +44,23 @@ class InfraLintTests(unittest.TestCase):
                 prefix + "Ideas/*", prefix + "Resources/_Review/AI Learning/*",
             })
 
+    def test_ordinary_updates_require_if_match_and_history_is_prefix_scoped(self):
+        from cloud_kb.storage import UPDATE_ROOTS
+        root = Path(__file__).parents[1]
+        templates = [json.loads((root / "infra" / name).read_text()) for name in (
+            "foundation.template.json", "bootstrap.template.json", "native-pipeline.template.json")]
+        for index, template in enumerate(templates):
+            statements = (template["Resources"]["ApiExecutionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+                          if index == 0 else template["Resources"]["RuntimePermissionsBoundary"]["Properties"]["PolicyDocument"]["Statement"])
+            sid = "UpdateOrdinaryNotesConditionally" if index == 0 else "OrdinaryNoteUpdates"
+            update = next(row for row in statements if row.get("Sid") == sid)
+            self.assertEqual(update["Condition"], {"Null": {"s3:if-match": "false"}})
+            paths = {row["Fn::Sub"].split("/notes/", 1)[1] for row in update["Resource"]}
+            self.assertEqual(paths, {prefix + "*" for prefix in UPDATE_ROOTS})
+            history = next(row for row in statements if row.get("Action") == "s3:ListBucketVersions")
+            self.assertEqual(set(history["Condition"]["StringLike"]["s3:prefix"]),
+                             {"notes/" + prefix + "*" for prefix in UPDATE_ROOTS})
+
     def test_custom_domain_create_uses_supported_scoped_conditions(self):
         root = Path(__file__).parents[1]
         for name in ("bootstrap.template.json", "native-pipeline.template.json"):

@@ -3,3 +3,4 @@ fastmcp-slim[server]==4.1.0
 boto3==1.43.114
 mangum==0.22.0
 py-key-value-aio==0.4.6
+PyYAML==6.0.3

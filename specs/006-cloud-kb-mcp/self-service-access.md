@@ -12,9 +12,12 @@ default, automated security/browser checks and deployment in this conversation.
 - `/access?client_id=...` offers Google owner sign-in and an explicit decision
   for the registered client. Show its ID, self-reported name and callbacks.
   A matching display name never transfers an existing grant to a new ID.
-- The owner chooses read-only or read plus new-note capture, for 90 or 365 days
+- The owner chooses read-only, read plus new-note capture, or (from 0.3.0)
+  read/create/update of ordinary notes, for 90 or 365 days
   from approval. Default: 365 days. Capture is restricted to
-  `Resources/_Review/AI Learning/`; existing-note edits are never granted here.
+  `Resources/_Review/AI Learning/`. Ordinary updates need the explicit third
+  option; create-only approvals never acquire `kb:update` silently. See
+  [note-updates.md](note-updates.md) for protected paths and revision checks.
   Existing grants retain their expiry until the owner explicitly renews.
 - Renewal and revocation use the same page. Expired/revoked clients may request
   recovery but cannot approve themselves. An MCP access token conveys no owner

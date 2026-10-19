@@ -3,11 +3,63 @@ import hashlib
 from pathlib import PurePosixPath
 import re
 
+import yaml
+
 from botocore.exceptions import ClientError
 
 
 MAX_NOTE_BYTES = 256 * 1024
 CAPTURE_ROOTS = ("Ideas/", "Resources/_Review/AI Learning/")
+UPDATE_ROOTS = ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/")
+
+
+def validate_update_prefix(prefix):
+    if not isinstance(prefix, str) or not prefix.endswith("/") or not prefix.startswith(UPDATE_ROOTS):
+        raise ValueError("invalid_update_destination")
+    normalize_path(prefix + "scope.md")
+    return prefix
+
+
+def update_requires_review(path, content):
+    """Source snapshots, policies and canonical/verified knowledge stay protected."""
+    parts = {part.casefold() for part in path.split("/")}
+    if parts & {"wiki", "archive", "archives", "source archives", "source snapshots", "clippings", "agents.md"}:
+        return True
+    normalized = content.replace("\r\n", "\n")
+    if normalized.startswith("---\n") and normalized.count("---") < 2:
+        return True
+    frontmatter = normalized.split("---", 2)[1] if normalized.startswith("---\n") and normalized.count("---") >= 2 else ""
+    if len(frontmatter.encode()) > 16_384:
+        return True
+    try:
+        node = yaml.compose(frontmatter, Loader=yaml.SafeLoader)
+    except (yaml.YAMLError, RecursionError):
+        return True
+    if node is None:
+        return False
+    if not isinstance(node, yaml.MappingNode) or node.tag != "tag:yaml.org,2002:map":
+        return True
+    # Inspect pairs, including duplicate keys, without constructing arbitrary
+    # YAML objects or recursively walking aliases. Quotes/folded scalars cannot
+    # hide a protected authority marker.
+    for key, value in node.value:
+        if not isinstance(key, yaml.ScalarNode):
+            return True
+        name = key.value.casefold()
+        if name not in {"status", "authority", "type"}:
+            continue
+        if not isinstance(value, yaml.ScalarNode):
+            return True
+        if value.tag in {"tag:yaml.org,2002:null", "tag:yaml.org,2002:bool", "tag:yaml.org,2002:int", "tag:yaml.org,2002:float"}:
+            continue
+        if value.tag != "tag:yaml.org,2002:str":
+            return True
+        value = value.value.strip().casefold()
+        if name in {"status", "authority"} and value in {"canonical", "binding", "verified", "confirmed"}:
+            return True
+        if name == "type" and value in {"source", "source-snapshot", "raw-source", "web-clip", "book-excerpt"}:
+            return True
+    return False
 
 
 def validate_capture_prefix(prefix: str) -> str:
@@ -54,11 +106,19 @@ class S3Notes:
         self.bucket = bucket
 
     def fetch(self, path: str, max_chars: int = 10_000) -> dict:
-        path = normalize_path(path)
         if isinstance(max_chars, bool) or not isinstance(max_chars, int) or not 1 <= max_chars <= 20_000:
             raise ValueError("invalid_max_chars")
+        note = self.read(path)
+        result = {key: note[key] for key in ("path", "revision", "sha256", "tier", "persistence", "indexing")}
+        result.update(content=note["content"][:max_chars], truncated=len(note["content"]) > max_chars)
+        return result
+
+    def read(self, path, version=None):
+        """Full bounded internal read; fetch never returns private write metadata."""
+        path = normalize_path(path)
         try:
-            response = self.client.get_object(Bucket=self.bucket, Key="notes/" + path)
+            response = self.client.get_object(Bucket=self.bucket, Key="notes/" + path,
+                                              **({"VersionId": version} if version else {}))
         except ClientError as error:
             if error.response["Error"]["Code"] in {"NoSuchKey", "NoSuchVersion", "404"}:
                 raise ValueError("not_found") from None
@@ -78,10 +138,12 @@ class S3Notes:
             raise ValueError("invalid_markdown_encoding") from None
         # Content digest is independent of opaque S3 ETags and storage VersionIds.
         return {
-            "path": path, "content": content[:max_chars],
+            "path": path, "content": content, "raw": raw,
             "revision": response.get("VersionId") or response["ETag"],
+            "etag": response["ETag"], "metadata": response.get("Metadata", {}),
+            "content_type": response.get("ContentType", "text/markdown; charset=utf-8"),
             "sha256": hashlib.sha256(raw).hexdigest(),
             "tier": authority(path, content),
-            "truncated": len(content) > max_chars,
+            "truncated": False,
             "persistence": "persisted", "indexing": "not_checked",
         }
