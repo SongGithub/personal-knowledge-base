@@ -1,8 +1,8 @@
 # MCP tools and owner review contract
 
-**Status**: Proposed contract, 2026-10-17; not currently exposed by the local
-read-only server. Protocol/SDK versions and client authorization compatibility
-must be pinned and exercised during implementation.
+**Status**: Search/fetch are deployed. The capture contract is implemented in
+the writeback branch with synthetic HTTP acceptance; it is not deployed yet.
+`update_note` and owner review remain proposed work.
 
 ## Shared rules
 
@@ -24,13 +24,17 @@ must be pinned and exercised during implementation.
 |---|---|---|---|
 | `search_kb` | query, bounded limit, strategy | `kb:read` plus visible paths | Permitted paths/excerpts, authority tiers, indexed source revisions, snapshot/contract IDs, freshness and pending-change indication |
 | `fetch_note` | normalized exact path, optional permitted revision, bounded max_chars | `kb:read` for current/historical access as applicable | Markdown, revision, truncation, authority and separate indexed/current status; works without a fresh index |
-| `capture_learning` | operation_id, configured destination, learning text, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt, or clearly labeled review proposal; audit/index statuses |
+| `capture_learning` | operation_id, exact granted `Ideas/` destination, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
 | `update_note` | operation_id, exact path, expected_revision, bounded proposed patch and provenance | `kb:update` for path | Conditional saved revision or inspectable proposal; never an unconditional overwrite |
 | `get_change_status` | authorized operation_id | Access to the originating operation/path | Review, persistence, activity-audit and indexing states, receipt if committed, bounded failure/retry information |
 
-Suggested existing bounds to retain: query <=2,000 characters; search limit 1–10;
-fetch max_chars 1–20,000. Mutation and attachment bounds are configurable and must
-be fixed before tools are enabled. Search tokens do not acquire mutation rights.
+Bounds: query <=2,000 characters; search limit 1–10; fetch max_chars 1–20,000;
+capture title <=200 characters, Markdown <=12,000 characters, origin <=500,
+evidence <=10 URLs of <=2,048 characters and 4,000 characters total, and
+operation ID <=128 characters.
+Search tokens do not acquire mutation rights. Captures can write only below
+the owner's separately granted `Ideas/` prefix; the runtime role and writer
+enforce the same restriction.
 
 `capture_learning` searches for existing material before creating a duplicate.
 The owner configures existing taxonomy destinations for captures/proposals;

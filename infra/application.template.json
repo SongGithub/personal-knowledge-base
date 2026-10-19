@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Google-protected read-only KB MCP HTTP application. Requires foundation, approved runtime secret permission and a built code artifact.",
+  "Description": "Google-protected KB MCP HTTP application with scoped retrieval and Ideas-only capture. Requires foundation, approved runtime secret permission and a built code artifact.",
   "Parameters": {
     "ProjectName": {
       "Type": "String",

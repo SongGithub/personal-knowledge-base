@@ -6,8 +6,9 @@ import unittest
 
 from cryptography.fernet import Fernet
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from fastmcp.exceptions import ToolError
 
-from cloud_kb.auth import DynamoOAuthStore
+from cloud_kb.auth import DynamoOAuthStore, GrantGate
 
 
 class Table:
@@ -25,7 +26,33 @@ class Table:
         return {"Attributes": self.items.pop((Key["PK"], Key["SK"]), None)}
 
 
+class GrantTable:
+    def __init__(self, grant):
+        self.grant = grant
+
+    def get_item(self, *, Key, ConsistentRead):
+        assert ConsistentRead
+        return {"Item": self.grant} if Key == {"PK": "GRANT#owner", "SK": "CLIENT#client"} else {}
+
+
+class Token:
+    claims = {"sub": "owner"}
+    client_id = "client"
+    expires_at = time.time() + 60
+
+
 class AuthStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_capture_scope_and_prefix_are_separate_from_read_access(self):
+        grant = {"Revoked": False, "ExpiresAt": int(time.time()) + 60,
+                 "Scopes": ["kb:capture"], "CapturePrefixes": ["Ideas/"]}
+        gate = GrantGate(GrantTable(grant), "owner")
+        self.assertEqual(gate.capture_prefixes(Token()), ["Ideas/"])
+        with self.assertRaises(ToolError):
+            gate.read_prefixes(Token())
+        grant["CapturePrefixes"] = ["Wiki/"]
+        with self.assertRaises(ToolError):
+            gate.capture_prefixes(Token())
+
     async def test_encrypted_state_survives_adapter_restart(self):
         table = Table()
         encryption = Fernet.generate_key()

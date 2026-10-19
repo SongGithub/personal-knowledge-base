@@ -84,6 +84,14 @@ grants are preserved and require owner review. Normal AI clients receive no AWS
 credentials and cannot grant themselves access. `--authorization-file` stores
 the login URL privately for controlled browser use.
 
+After a write-enabled release, use `tools/grant_mcp_client.py` from an owner
+operator session to grant one authenticated client `kb:capture` on `Ideas/`.
+The helper checks the deployed owner binding, expires grants within 30 days,
+preserves any still-active grant, and supports the standard AWS SDK chain
+(including an SSO profile). Add `--scope kb:read --read-prefix Ideas/` only when
+that same client also needs to retrieve its captures. No grant is created by
+deployment or Google sign-in alone.
+
 These helpers require the constrained operator/test dependencies, including
 Requests; they are excluded from the code-only Lambda artifact.
 

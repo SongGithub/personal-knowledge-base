@@ -113,8 +113,7 @@
               "Effect": "Allow",
               "Action": [
                 "s3:GetObject",
-                "s3:GetObjectVersion",
-                "s3:PutObject"
+                "s3:GetObjectVersion"
               ],
               "Resource": [
                 {
@@ -122,6 +121,18 @@
                 },
                 {
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/attachments/*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": "s3:PutObject",
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Ideas/*"
                 },
                 {
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"

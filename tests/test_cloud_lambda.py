@@ -20,7 +20,7 @@ class LambdaAdapterTests(unittest.TestCase):
         pair = RSAKeyPair.generate()
         verifier = JWTVerifier(public_key=pair.public_key, issuer="https://synthetic.invalid", audience="synthetic-kb")
         app = api.create_app(auth_provider=verifier, gate=Unused(), notes=Unused(), search=Unused(),
-                             base_url="https://synthetic.execute-api.invalid")
+                             writer=Unused(), base_url="https://synthetic.execute-api.invalid")
         token = pair.create_token(issuer="https://synthetic.invalid", audience="synthetic-kb")
         def event(method, params=None, authenticated=True):
             headers = {"host": "synthetic.execute-api.invalid", "content-type": "application/json",
@@ -44,7 +44,8 @@ class LambdaAdapterTests(unittest.TestCase):
                 for _ in range(2):
                     listed = api.handler(event("tools/list"), SimpleNamespace())
                     self.assertEqual(listed["statusCode"], 200)
-                    self.assertEqual(len(json.loads(listed["body"])["result"]["tools"]), 2)
+                    names = {tool["name"] for tool in json.loads(listed["body"])["result"]["tools"]}
+                    self.assertEqual(names, {"search_kb", "fetch_note", "capture_learning", "get_change_status"})
                 self.assertEqual(factory.call_count, 1)
         finally:
             loop.close()

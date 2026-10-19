@@ -682,7 +682,7 @@
                   "Effect": "Allow",
                   "Action": "s3:PutObject",
                   "Resource": {
-                    "Fn::Sub": "${DataBucket.Arn}/notes/*"
+                    "Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"
                   }
                 },
                 {
