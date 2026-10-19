@@ -20,7 +20,7 @@ from cloud_kb.storage import S3Notes, normalize_path, permitted
 from cloud_kb.writer import LearningWriter
 
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 def capture_value(current, legacy, name):

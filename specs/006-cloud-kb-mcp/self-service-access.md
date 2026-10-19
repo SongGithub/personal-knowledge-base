@@ -48,6 +48,11 @@ default, automated security/browser checks and deployment in this conversation.
   suppressing cross-origin referrers. Origin/CSRF checks remain enforced.
 - This simulated Google flow is not evidence of a real owner login or approval.
   Deployment and real owner sign-in evidence remain pending below.
+- Initial live sign-in verification caught a pinned-library mismatch: FastMCP's
+  upstream client is token-only and does not expose Authlib's authorization-URL
+  helper. Version 0.2.1 builds Google's standard URL/PKCE challenge directly,
+  requests online identity access only, and adds a real-provider start-route
+  regression check plus exact challenge/verifier matching. All 92 checks pass.
 
 ## Sources
 

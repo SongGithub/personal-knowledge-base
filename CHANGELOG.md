@@ -1,5 +1,13 @@
 # Changelog
 
+## Cloud KB 0.2.1
+
+### Fixed
+
+- Start Google owner sign-in with the pinned FastMCP token-only upstream client;
+  generate the standard Google authorization URL and PKCE challenge directly.
+  Live rollout verification caught this before real owner approval was accepted.
+
 ## Cloud KB 0.2.0
 
 ### Added

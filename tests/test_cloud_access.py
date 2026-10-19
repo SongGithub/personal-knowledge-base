@@ -86,10 +86,7 @@ class Provider:
 
     @asynccontextmanager
     async def _upstream_oauth_client(self):
-        from authlib.integrations.httpx_client import AsyncOAuth2Client
-        async with AsyncOAuth2Client(client_id="synthetic-google", client_secret="synthetic-secret") as oauth:
-            oauth.fetch_token = self.exchange
-            yield oauth
+        yield SimpleNamespace(fetch_token=self.exchange)
 
 
 class AccessTests(unittest.IsolatedAsyncioTestCase):
@@ -136,11 +133,17 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         params = await self.sign_in()
         self.assertEqual(params["code_challenge_method"], ["S256"])
         self.assertEqual(params["redirect_uri"], [ORIGIN + "/auth/callback"])
+        self.assertEqual(params["client_id"], ["synthetic-google"])
         self.assertTrue(params["state"][0].startswith(STATE_PREFIX))
         self.assertEqual(set(params["scope"][0].split()), {"openid", "https://www.googleapis.com/auth/userinfo.email"})
         self.assertEqual(self.portal.verifier.audience, "synthetic-google")
         self.provider.exchange.assert_awaited_once()
         self.assertIn("code_verifier", self.provider.exchange.call_args.kwargs)
+        from base64 import urlsafe_b64encode
+        import hashlib
+        verifier = self.provider.exchange.call_args.kwargs["code_verifier"]
+        expected = urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+        self.assertEqual(params["code_challenge"], [expected])
         form = await self.form()
         # A new instance decrypts sessions and forms after a cold start.
         self.portal.store = self.make_portal().store
@@ -293,6 +296,9 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
                          notes=None, search=None, base_url=ORIGIN)
         async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app), base_url=ORIGIN) as http:
             self.assertEqual((await http.get("/access?client_id=client-one")).status_code, 200)
+            login = await http.get("/access/login?client_id=client-one")
+            self.assertEqual(login.status_code, 303, login.text)
+            self.assertEqual(urlsplit(login.headers["location"]).netloc, "accounts.google.com")
             callback = await http.get("/auth/callback?state=" + STATE_PREFIX + secrets.token_urlsafe(32) + "&code=bad")
             self.assertEqual(callback.status_code, 403)
             denied = await http.post("/access", data={"nonce": "fake"}, headers={"Origin": ORIGIN})

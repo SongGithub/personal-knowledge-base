@@ -1,7 +1,9 @@
 """Google owner browser approval, renewal and revocation; never an MCP tool."""
 import asyncio
+from base64 import urlsafe_b64encode
 from datetime import datetime, timezone
 from html import escape
+import hashlib
 import logging
 import re
 import secrets
@@ -95,6 +97,7 @@ class OwnerAccess:
         self.grants = GrantDecisions(table, owner_sub)
         self.owner_sub, self.base_url = owner_sub, base_url.rstrip("/")
         self.callback_uri = self.base_url + provider._redirect_path
+        self.google_client_id = google_client_id
         self.verifier = GoogleTokenVerifier(required_scopes=SCOPES, audience=google_client_id,
                                             cache_ttl_seconds=0, timeout_seconds=6)
 
@@ -153,12 +156,15 @@ class OwnerAccess:
         # request cannot mutate a grant, even if initiated from another site.
         state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(48)
         await self.save("login:" + state, {"client_id": cid, "verifier": verifier}, 600)
-        async with self.provider._upstream_oauth_client() as oauth:
-            oauth.code_challenge_method = "S256"
-            url, _ = oauth.create_authorization_url(
-                "https://accounts.google.com/o/oauth2/v2/auth", state=STATE_PREFIX + state,
-                redirect_uri=self.callback_uri, scope=" ".join(SCOPES),
-                code_verifier=verifier, prompt="select_account")
+        # FastMCP's pinned upstream client supports token exchange only. Build
+        # Google's standard authorization URL without a legacy httpx client.
+        challenge = urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+        url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+            "response_type": "code", "client_id": self.google_client_id,
+            "state": STATE_PREFIX + state, "redirect_uri": self.callback_uri,
+            "scope": " ".join(SCOPES), "code_challenge": challenge,
+            "code_challenge_method": "S256", "prompt": "select_account", "access_type": "online",
+        })
         response = redirect(url)
         cookie(response, LOGIN_COOKIE, state, 600)
         return response
