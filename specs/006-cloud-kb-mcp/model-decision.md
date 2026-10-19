@@ -3,8 +3,11 @@
 **Status:** Owner approved private Markdown chunks and search queries through
 Bedrock Sydney on 2026-10-19, selecting behaviour/bilingual-quality parity over
 identical bge-m3 rankings. The initial hybrid release and synthetic OAuth proof
-are recorded in [acceptance-results.md](acceptance-results.md); the strategy
-comparison below is under review.
+are recorded in [acceptance-results.md](acceptance-results.md). After the
+expanded retrieval comparison, hybrid remains the cloud default with the
+semantic-shortlist and explicit-identifier adjustments recorded below. The
+default-winner gate passes on the latest live synthetic benchmark; deployment
+is pending.
 
 ## Candidate
 
@@ -46,16 +49,28 @@ on the same cases and blocks a mismatched release. This is a fixture-level
 decision, not evidence that vector search is universally better on the private
 corpus.
 
-The subsequent `synthetic-retrieval-stress-v3` fixture has 20 fully synthetic
-notes and 33 judged queries. It adds similar notes with different answers,
-paraphrases, near-matching identifiers and six cross-language cases. The live
-Bedrock Sydney run on 2026-10-19 measured lexical top-1/top-3 at 22/33 and
-26/33, vector at 28/33 and 33/33, and hybrid at 25/33 and 31/33. Exact-ID
-top-1 was 7/7 lexical, 6/7 vector and 6/7 hybrid. Cross-language top-3 was
-1/6 lexical, 6/6 vector and 5/6 hybrid. The hybrid quality gate now fails,
-correctly blocking a model/ranking release until the miss is resolved. Synthetic
-median query times were 0.5 ms lexical, 136.8 ms vector and 135.3 ms hybrid;
-these use an in-memory 20-note index and exclude HTTP and cold starts.
+The `synthetic-retrieval-stress-v3` fixture has 20 fully synthetic notes and 33
+judged queries. It adds similar notes with different answers, paraphrases,
+near-matching identifiers and six cross-language cases. Before the latest fix,
+the live Bedrock Sydney run measured lexical top-1/top-3 at 22/33 and 26/33,
+vector at 28/33 and 33/33, and hybrid at 25/33 and 31/33. Exact-ID top-1 was
+7/7 lexical, 6/7 vector and 6/7 hybrid. Cross-language top-3 was 1/6 lexical,
+6/6 vector and 5/6 hybrid. This exposed one bilingual fusion miss and blocked
+the quality gate.
+
+The fix makes the hybrid shortlist semantic-first for ordinary natural-language
+queries: it preserves the vector top three and uses reciprocal-rank fusion for
+the remaining candidates. Queries containing an explicit hyphenated note ID
+start with lexical ranking, which correctly resolves an ID that vector search
+confused with a related note. The benchmark now caches each query vector across
+strategy comparisons so lexical, vector and hybrid are scored against the same
+model output. A new live Bedrock Sydney run on 2026-10-19 passed both quality
+and default-winner gates: lexical top-1/top-3 22/33 and 26/33; vector 28/33
+and 33/33; hybrid 29/33 and 33/33. Exact-ID top-1 was 7/7 lexical, 6/7 vector
+and 7/7 hybrid. Cross-language top-3 was 1/6 lexical, 6/6 vector and 6/6
+hybrid. Hybrid MRR was 0.9343 versus vector 0.9192 and lexical 0.7273. The
+in-memory synthetic index median query times were 0.5 ms lexical, 136.8 ms
+vector and 135.3 ms hybrid; these exclude HTTP and cold starts.
 
 A direct read-only check of the deployed 152-note, 2,457-chunk private index
 used three generic queries. One cold snapshot load took 10.9 seconds; later
@@ -67,26 +82,27 @@ lookup favors lexical matching and cannot substitute for human-judged natural
 language relevance. These measurements are direct backend calls, not deployed
 OAuth/HTTP latency or availability tests.
 
-**Recommendation:** retain the deployed hybrid default for now; do not infer
-from the small synthetic set that vector is better for the owner's actual
-questions. Fix the cross-language fusion miss, then judge 20–30 private
-representative questions with expected notes across exact lookup, English,
-Chinese, cross-language and ambiguous topics. Keep the exact lexical and pure
-vector strategies exposed. If vector still leads on that private set, change
-the default with a new versioned gate. The current search always ranks a
-candidate for vector queries and has no relevance threshold or abstention
-test; no-answer behavior needs its own design and evaluation.
+**Recommendation:** retain `hybrid` as the cloud default. The semantic-first
+shortlist and lexical identifier handling now pass the expanded floor and beat
+vector on top-1, exact-ID accuracy and MRR, while tying vector on top-3 and
+cross-language recall. Keep `lexical` and `vector` exposed for explicit
+comparisons. This synthetic result does not establish relevance on the private
+corpus; T047 remains open for an owner-judged 20–30-query set covering exact
+lookup, English, Chinese, cross-language and ambiguous topics. The current
+search always ranks a candidate for vector queries and has no relevance
+threshold or abstention test; no-answer behavior needs its own design and
+evaluation. The local OpenClaw MCP retains its existing hybrid contract.
 
 The v3 minimum quality floor requires at least 30 cases, six cross-language
 cases and seven exact-identifier cases; the configured default must reach at least
 75% top-1, 90% top-3, all cross-language top-3, all but one exact top-1, and
 remain within one top-1 result of lexical. The separate winner gate requires
 the configured default to rank first by top-1, then top-3, cross-language
-top-3, exact top-1 and mean reciprocal rank. The live synthetic comparison
-runs on every trusted CodeBuild release; the winner condition is enforced when
-the pinned commit changes the embedding, chunking, ranking or benchmark
-configuration, or when the approved model ARN changes. An unavailable Git
-comparison conservatively enables the winner condition.
+top-3, exact top-1 and mean reciprocal rank. The live Bedrock comparison runs
+only when the approved model ARN or pinned embedding, chunking, ranking or
+benchmark configuration changes. For those changes, the quality floor and
+winner checks are mandatory; unrelated releases skip Bedrock calls. An
+unavailable Git comparison conservatively enables both checks.
 
 The Bedrock Sydney account reported retention mode `inherit` on 2026-10-19.
 This defers to the model default. AWS states that default mode may retain data

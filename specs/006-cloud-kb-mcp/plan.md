@@ -83,6 +83,16 @@ may bypass a remaining gate because the plan exists.
 
 ## Architecture and request lifecycle
 
+The public MCP hostname is planned as `mcp.midu.com.au`, backed by the existing
+Regional HTTP API in Sydney. Cloudflare remains authoritative DNS; API Gateway
+terminates TLS with an ACM-managed public certificate validated by a DNS CNAME.
+The generated `execute-api` endpoint remains available as the deployment
+health-check fallback. Use the free, managed ACM certificate rather than
+importing Let's Encrypt material, which ACM does not auto-renew. DNS, Google
+OAuth callback registration and the custom-domain release are separate rollout
+steps documented in [the custom-domain runbook](../../infra/CUSTOM-DOMAIN.md);
+this plan does not claim that the custom endpoint is live.
+
 1. AI client discovers MCP/OAuth endpoints and signs in via Google. Bind the
    configured stable owner subject; issue a separate scoped client grant.
 2. The HTTP adapter validates the service's audience-bound access token and

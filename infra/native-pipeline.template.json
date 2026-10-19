@@ -59,6 +59,21 @@
       "Type": "String",
       "NoEcho": true,
       "Default": "[\"http://localhost:8765/callback\"]"
+    },
+    "CustomDomainName": {
+      "Type": "String",
+      "Default": "",
+      "AllowedValues": ["", "mcp.midu.com.au"]
+    },
+    "CustomDomainCertificateArn": {
+      "Type": "String",
+      "Default": "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000",
+      "AllowedPattern": "^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$"
+    },
+    "CloudflareDnsTokenSecretArn": {
+      "Type": "String",
+      "Default": "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns",
+      "AllowedPattern": "^arn:aws:secretsmanager:ap-southeast-2:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$"
     }
   },
   "Conditions": {
@@ -73,6 +88,12 @@
           ]
         }
       ]
+    },
+    "HasCloudflareDnsToken": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "CloudflareDnsTokenSecretArn"}, "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns"]}]
+    },
+    "HasCustomDomain": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "CustomDomainName"}, ""]}]
     },
     "AllowMockSeeding": {
       "Fn::And": [
@@ -583,6 +604,36 @@
                       "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
                     }
                   ]
+                },
+                {
+                  "Sid": "CreateRegionalMcpDomain",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:POST",
+                    "apigateway:PUT",
+                    "apigateway:AddCertificateToDomain"
+                  ],
+                  "Resource": {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames"},
+                  "Condition": {"StringEquals": {
+                    "apigateway:Request/EndpointType": "REGIONAL",
+                    "apigateway:Request/SecurityPolicy": "TLS_1_2",
+                    "aws:RequestTag/Project": {"Ref": "ProjectName"},
+                    "aws:RequestTag/Environment": {"Ref": "Environment"}
+                  }}
+                },
+                {
+                  "Sid": "ManageOnlyMcpDomainAndMappings",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:DELETE",
+                    "apigateway:AddCertificateToDomain", "apigateway:RemoveCertificateFromDomain",
+                    "apigateway:TagResource", "apigateway:UntagResource"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au/*"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"}
+                  ]
                 }
               ]
             }
@@ -817,6 +868,30 @@
                   }
                 },
                 {
+                  "Fn::If": [
+                    "HasCloudflareDnsToken",
+                    {
+                      "Sid": "ReadOnlyCloudflareDnsToken",
+                      "Effect": "Allow",
+                      "Action": "secretsmanager:GetSecretValue",
+                      "Resource": {"Ref": "CloudflareDnsTokenSecretArn"}
+                    },
+                    {"Ref": "AWS::NoValue"}
+                  ]
+                },
+                {
+                  "Fn::If": [
+                    "HasCustomDomain",
+                    {
+                      "Sid": "DescribeConfiguredCustomDomainCertificate",
+                      "Effect": "Allow",
+                      "Action": "acm:DescribeCertificate",
+                      "Resource": {"Ref": "CustomDomainCertificateArn"}
+                    },
+                    {"Ref": "AWS::NoValue"}
+                  ]
+                },
+                {
                   "Sid": "PrivateBuildLogs",
                   "Effect": "Allow",
                   "Action": [
@@ -989,6 +1064,25 @@
                 "Ref": "ClientRedirectUris"
               },
               "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "MCP_CUSTOM_DOMAIN_NAME",
+              "Value": {"Ref": "CustomDomainName"},
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN",
+              "Value": {
+                "Fn::If": ["HasCustomDomain", {"Ref": "CustomDomainCertificateArn"}, ""]
+              },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Fn::If": [
+                "HasCloudflareDnsToken",
+                {"Name": "MCP_CLOUDFLARE_DNS_TOKEN", "Value": {"Fn::Sub": "${CloudflareDnsTokenSecretArn}:CLOUDFLARE_API_TOKEN_DNS"}, "Type": "SECRETS_MANAGER"},
+                {"Ref": "AWS::NoValue"}
+              ]
             },
             {
               "Name": "MCP_SEED_MOCK",

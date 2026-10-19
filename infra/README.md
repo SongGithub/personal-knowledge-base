@@ -43,6 +43,7 @@ separate reviewed trust/approval policy, not just an input that changes the name
 | `native-pipeline.template.json`, `buildspec.yml` | Selected on-demand CodeBuild pipeline with service trust, exact source commit and the same bounded runtime/provisioning scope |
 | `foundation.template.json` | Private KB/index/release storage, control records, ingestion queues, log groups and runtime roles |
 | `application.template.json` | Google-protected Lambda and routes/integration/stage on the anchored HTTP API; read scopes and Ideas-only capture scopes are checked by the backend |
+| `CUSTOM-DOMAIN.md` | ACM certificate, Cloudflare DNS and OAuth rollout for `mcp.midu.com.au` |
 | `requirements.txt` | Pinned infrastructure validator used in local/PR checks |
 | `../.github/workflows/infra.yml` | Credential-free validation and OIDC deployment from the trusted branch |
 
