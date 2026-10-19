@@ -158,7 +158,13 @@ class CloudHTTPTests(unittest.TestCase):
         async with Client(origin + "/mcp", auth=token(), timeout=10) as client:
             tools = await client.list_tools()
             self.assertEqual({tool.name for tool in tools},
-                             {"search_kb", "fetch_note", "capture_learning", "get_change_status"})
+                             {"search_kb", "fetch_note", "capture_learning",
+                              "get_change_status", "get_access_status"})
+            access = (await client.call_tool("get_access_status", {})).data
+            self.assertEqual(access["client_id"], "synthetic-client")
+            self.assertTrue(access["owner"])
+            self.assertTrue(access["grant"]["present"])
+            self.assertEqual(access["grant"]["scopes"], ["kb:capture", "kb:read"])
             found = (await client.call_tool("search_kb", {"query": "citrus-lantern-742", "strategy": "lexical"})).data
             self.assertEqual(found["results"][0]["path"], PATH)
             self.assertEqual(found["results"][0]["freshness"], "current")
@@ -178,6 +184,13 @@ class CloudHTTPTests(unittest.TestCase):
                 "operation_id": "synthetic-capture-001"})).data
             self.assertEqual(status["path"], capture["path"])
             self.assertEqual(status["persistence"], "persisted")
+        async with Client(origin + "/mcp", auth=token(client_id="synthetic-unregistered"),
+                          timeout=10) as client:
+            with self.assertRaises(ToolError) as raised:
+                await client.call_tool("fetch_note", {"path": PATH})
+            self.assertIn("grant_required", str(raised.exception))
+            status = (await client.call_tool("get_access_status", {})).data
+            self.assertFalse(status["grant"]["present"])
         async with Client(origin + "/mcp", auth=token(client_id="synthetic-reader"), timeout=10) as client:
             fetched_capture = (await client.call_tool("fetch_note", {"path": capture["path"]})).data
             self.assertEqual(fetched_capture["content"].encode(), captured_raw)

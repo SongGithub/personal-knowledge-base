@@ -91,49 +91,117 @@ def google_provider(settings, secret, table):
 
 
 class GrantGate:
+    """Deny access unless the verified owner holds a live grant for this client."""
+
     def __init__(self, table, owner_sub):
         self.table, self.owner_sub = table, owner_sub
 
+    @staticmethod
+    def _subject(token):
+        # FastMCP exposes the verified upstream identity as both
+        # AccessToken.subject and claims["sub"]. Accept either one so a library
+        # change cannot turn every request into an unexplained "forbidden".
+        return (token.claims or {}).get("sub") or getattr(token, "subject", None)
+
     def _grant(self, token):
-        if token is None or token.claims.get("sub") != self.owner_sub or not token.client_id:
-            raise ToolError("forbidden")
+        if token is None:
+            raise ToolError("forbidden: unauthenticated")
+        if not token.client_id:
+            raise ToolError("forbidden: missing_client_id")
+        subject = self._subject(token)
+        if not subject:
+            raise ToolError("forbidden: identity_unavailable")
+        if subject != self.owner_sub:
+            raise ToolError("forbidden: owner_mismatch")
         if token.expires_at is None or token.expires_at <= time.time():
             raise ToolError("unauthorized")
         grant = self.table.get_item(
             Key={"PK": "GRANT#" + self.owner_sub, "SK": "CLIENT#" + token.client_id},
             ConsistentRead=True,
-        ).get("Item", {})
-        if grant.get("Revoked", True) or float(grant.get("ExpiresAt", 0)) <= time.time():
-            raise ToolError("forbidden")
+        ).get("Item")
+        if not grant:
+            # OAuth consent proves identity, not KB access. A client that
+            # re-registers gets a new client_id, so grants do not carry over.
+            raise ToolError(
+                "forbidden: grant_required; no KB grant exists for OAuth client "
+                + token.client_id)
+        if grant.get("Revoked", True):
+            raise ToolError(
+                "forbidden: grant_revoked; the KB grant for OAuth client "
+                + token.client_id + " is revoked")
+        if float(grant.get("ExpiresAt", 0)) <= time.time():
+            raise ToolError(
+                "forbidden: grant_expired; the KB grant for OAuth client "
+                + token.client_id + " has expired")
         return grant
+
+    def status(self, token):
+        """Describe this caller's verified identity and grant without reading notes."""
+        claims = (token.claims or {}) if token is not None else {}
+        subject = self._subject(token) if token is not None else None
+        result = {
+            "authenticated": token is not None,
+            "client_id": getattr(token, "client_id", None),
+            "owner": bool(subject) and subject == self.owner_sub,
+            "identity": {"subject_present": bool(subject), "email": claims.get("email")},
+            "grant": {"present": False, "revoked": None, "expires_at": None, "scopes": []},
+        }
+        # Only the owner can hold a grant, so never probe the table for other
+        # callers and never disclose whether some other client is granted.
+        if not result["client_id"] or not result["owner"]:
+            return result
+        grant = self.table.get_item(
+            Key={"PK": "GRANT#" + self.owner_sub, "SK": "CLIENT#" + token.client_id},
+            ConsistentRead=True,
+        ).get("Item")
+        if grant:
+            result["grant"] = {
+                "present": True,
+                "revoked": bool(grant.get("Revoked", True)),
+                "expires_at": int(float(grant["ExpiresAt"])) if "ExpiresAt" in grant else None,
+                "scopes": sorted(grant.get("Scopes", [])),
+            }
+        return result
 
     def read_prefixes(self, token):
         grant = self._grant(token)
         if "kb:read" not in grant.get("Scopes", []):
-            raise ToolError("forbidden")
+            raise ToolError(
+                "forbidden: missing_scope; the KB grant for OAuth client "
+                + token.client_id + " does not include kb:read")
         prefixes = grant.get("Prefixes", [])
         if not isinstance(prefixes, list) or not all(isinstance(prefix, str) for prefix in prefixes):
-            raise ToolError("forbidden")
+            raise ToolError(
+                "forbidden: malformed_grant; the KB grant for OAuth client "
+                + token.client_id + " has invalid read prefixes")
         return prefixes
 
     def capture_prefixes(self, token):
         grant = self._grant(token)
         if "kb:capture" not in grant.get("Scopes", []):
-            raise ToolError("forbidden")
+            raise ToolError(
+                "forbidden: missing_scope; the KB grant for OAuth client "
+                + token.client_id + " does not include kb:capture")
         prefixes = grant.get("CapturePrefixes", [])
         if (not isinstance(prefixes, list) or not prefixes or
                 not all(isinstance(prefix, str) and prefix.startswith("Ideas/") and
                         prefix.endswith("/") for prefix in prefixes)):
-            raise ToolError("forbidden")
+            raise ToolError(
+                "forbidden: malformed_grant; the KB grant for OAuth client "
+                + token.client_id + " has invalid capture prefixes")
         try:
             for prefix in prefixes:
                 normalize_path(prefix + "scope.md")
         except ValueError:
-            raise ToolError("forbidden") from None
+            raise ToolError(
+                "forbidden: malformed_grant; the KB grant for OAuth client "
+                + token.client_id + " has invalid capture prefixes") from None
         return prefixes
 
     def operation_identity(self, token):
         grant = self._grant(token)
         if "kb:capture" not in grant.get("Scopes", []):
-            raise ToolError("forbidden")
+            raise ToolError(
+                "forbidden: missing_scope; the KB grant for OAuth client "
+                + token.client_id + " does not include kb:capture")
         return self.owner_sub, token.client_id

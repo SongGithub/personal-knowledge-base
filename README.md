@@ -24,7 +24,8 @@ Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
 (`ap-southeast-2`).
 
 - The cloud MCP, private S3 note copy and full hybrid index are deployed. The
-  service exposes search, fetch, raw learning capture and change-status tools.
+  service exposes search, fetch, raw learning capture, change-status and
+  access-status tools.
 - Google OAuth establishes identity. The backend separately enforces
   owner/client grants, scopes, path restrictions, expiry and revocation.
 - Desktop OAuth registration and sign-in have succeeded after adding the
@@ -89,6 +90,7 @@ retrieval behaviour and bilingual quality, rather than identical rankings.
 | `fetch_note` | Fetch current Markdown from S3 independently of indexing | `kb:read` and permitted note paths |
 | `capture_learning` | Create a new raw Markdown learning with provenance and an operation ID | Separate `kb:capture` grant for a specific `Ideas/` destination |
 | `get_change_status` | Check persistence and indexing status for a capture operation | The authenticated owner/client that owns the operation |
+| `get_access_status` | Show the caller's verified client ID, owner binding and grant state | Any authenticated client; reads no notes |
 
 The learning loop is **retrieve → apply → capture → index → retrieve again**.
 Capture writes a new note marked `unverified`; it does not approve or overwrite
@@ -136,6 +138,16 @@ The owner can provision bounded read/capture grants with
 [`tools/grant_mcp_client.py`](tools/grant_mcp_client.py), using an authorised AWS
 operator session and the verified owner/client identity. AI clients receive MCP
 credentials rather than AWS credentials or machine access.
+
+Grants are bound to the OAuth **client ID**, not just the owner. A client that
+registers again receives a new client ID and needs a new grant; repeating the
+Google consent screen does not create or move a grant. If a tool returns
+`forbidden: grant_required; no KB grant exists for OAuth client <id>`, grant that
+ID. Call `get_access_status` to see the client ID, whether the signed-in account
+is the owner and whether a live grant exists. Other `forbidden` reasons
+(`owner_mismatch`, `grant_revoked`, `grant_expired`, `missing_scope`,
+`malformed_grant`, `identity_unavailable`) are reported separately so the cause
+is not confused with a token or consent problem.
 
 For the local service, see the
 [OpenClaw and local MCP connection guide](docs/openclaw-kb-connection.md).
