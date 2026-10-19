@@ -59,6 +59,16 @@
       "Type": "String",
       "NoEcho": true,
       "Default": "[\"http://localhost:8765/callback\"]"
+    },
+    "CustomDomainName": {
+      "Type": "String",
+      "Default": "",
+      "AllowedValues": ["", "mcp.midu.com.au"]
+    },
+    "CustomDomainCertificateArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$"
     }
   },
   "Conditions": {
@@ -583,6 +593,35 @@
                       "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
                     }
                   ]
+                },
+                {
+                  "Sid": "CreateRegionalMcpDomain",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:POST",
+                    "apigateway:PUT",
+                    "apigateway:AddCertificateToDomain"
+                  ],
+                  "Resource": {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames"},
+                  "Condition": {"StringEquals": {
+                    "apigateway:Request/EndpointType": "REGIONAL",
+                    "apigateway:Request/RoutingMode": "API_MAPPING_ONLY",
+                    "apigateway:Request/SecurityPolicy": "TLS_1_2"
+                  }}
+                },
+                {
+                  "Sid": "ManageOnlyMcpDomainAndMappings",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:DELETE",
+                    "apigateway:AddCertificateToDomain", "apigateway:RemoveCertificateFromDomain",
+                    "apigateway:TagResource", "apigateway:UntagResource"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au/*"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"}
+                  ]
                 }
               ]
             }
@@ -988,6 +1027,16 @@
               "Value": {
                 "Ref": "ClientRedirectUris"
               },
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "MCP_CUSTOM_DOMAIN_NAME",
+              "Value": {"Ref": "CustomDomainName"},
+              "Type": "PLAINTEXT"
+            },
+            {
+              "Name": "MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN",
+              "Value": {"Ref": "CustomDomainCertificateArn"},
               "Type": "PLAINTEXT"
             },
             {

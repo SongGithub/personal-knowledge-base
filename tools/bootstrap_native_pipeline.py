@@ -39,7 +39,8 @@ def model_config_changed(previous_commit, source_commit, previous_model, current
 
 
 def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mock=False,
-              approved_embedding_model_arn=None):
+              approved_embedding_model_arn=None, custom_domain_name=None,
+              custom_domain_certificate_arn=None):
     if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("Select an exact 40-character source commit")
     cfn = session.client("cloudformation")
@@ -54,6 +55,16 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
         if error.response["Error"]["Code"] != "ValidationError" or "does not exist" not in error.response["Error"].get("Message", ""):
             raise
     old_parameters = {item["ParameterKey"]: item.get("ParameterValue", "") for item in previous.get("Parameters", [])} if previous else {}
+    selected_domain = custom_domain_name if custom_domain_name is not None else old_parameters.get("CustomDomainName", "")
+    selected_certificate = (custom_domain_certificate_arn if custom_domain_certificate_arn is not None
+                            else old_parameters.get("CustomDomainCertificateArn", ""))
+    if bool(selected_domain) != bool(selected_certificate):
+        raise ValueError("Custom hostname and its issued ACM certificate ARN must be configured together")
+    if selected_domain not in ("", "mcp.midu.com.au"):
+        raise ValueError("Only the owner-selected MCP hostname is allowed")
+    if selected_certificate and not re.fullmatch(
+            r"arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+", selected_certificate):
+        raise ValueError("Custom-domain certificate must be issued by ACM in ap-southeast-2")
     selected_model = approved_embedding_model_arn if approved_embedding_model_arn is not None else old_parameters.get("ApprovedEmbeddingModelArn", "")
     require_default_winner = model_config_changed(old_parameters.get("SourceCommit"), source_commit,
                                                    old_parameters.get("ApprovedEmbeddingModelArn", ""), selected_model)
@@ -61,6 +72,8 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
         {"ParameterKey": "SourceCommit", "ParameterValue": source_commit},
         {"ParameterKey": "EnableMockSeeding", "ParameterValue": "true" if seed_mock else "false"},
         {"ParameterKey": "RequireDefaultWinner", "ParameterValue": "true" if require_default_winner else "false"},
+        {"ParameterKey": "CustomDomainName", "ParameterValue": selected_domain},
+        {"ParameterKey": "CustomDomainCertificateArn", "ParameterValue": selected_certificate},
     ]
     if approved_embedding_model_arn is not None:
         if not re.fullmatch(r"arn:aws:bedrock:ap-southeast-2::foundation-model/cohere\.embed-multilingual-v3", approved_embedding_model_arn):
@@ -123,7 +136,11 @@ if __name__ == "__main__":
     parser.add_argument("--start-build", action="store_true")
     parser.add_argument("--seed-mock", action="store_true")
     parser.add_argument("--approved-embedding-model-arn")
+    parser.add_argument("--custom-domain-name", choices=("mcp.midu.com.au",))
+    parser.add_argument("--custom-domain-certificate-arn")
     args = parser.parse_args()
     print(json.dumps(bootstrap(session_from_file(args.env_file), args.source_commit, apply=args.apply,
                                start_build=args.start_build, seed_mock=args.seed_mock,
-                               approved_embedding_model_arn=args.approved_embedding_model_arn)))
+                               approved_embedding_model_arn=args.approved_embedding_model_arn,
+                               custom_domain_name=args.custom_domain_name,
+                               custom_domain_certificate_arn=args.custom_domain_certificate_arn)))

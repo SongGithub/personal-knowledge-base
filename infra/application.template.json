@@ -72,6 +72,18 @@
         "true",
         "false"
       ]
+    },
+    "CustomDomainName": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+      "Description": "Optional public MCP hostname in a domain you control."
+    },
+    "CustomDomainCertificateArn": {
+      "Type": "String",
+      "Default": "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000",
+      "AllowedPattern": "^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$",
+      "Description": "Issued ACM public certificate in ap-southeast-2 for CustomDomainName."
     }
   },
   "Resources": {
@@ -106,7 +118,11 @@
         "Environment": {
           "Variables": {
             "PKB_BASE_URL": {
-              "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+              "Fn::If": [
+                "CustomDomainEnabled",
+                {"Fn::Sub": "https://${CustomDomainName}"},
+                {"Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}"}
+              ]
             },
             "PKB_VAULT_BUCKET": {
               "Ref": "VaultBucket"
@@ -194,6 +210,30 @@
           "ThrottlingBurstLimit": 10,
           "ThrottlingRateLimit": 2
         }
+      }
+    },
+    "CustomApiDomain": {
+      "Type": "AWS::ApiGatewayV2::DomainName",
+      "Condition": "CustomDomainEnabled",
+      "Properties": {
+        "DomainName": {"Ref": "CustomDomainName"},
+        "DomainNameConfigurations": [{
+          "EndpointType": "REGIONAL",
+          "CertificateArn": {"Ref": "CustomDomainCertificateArn"},
+          "SecurityPolicy": "TLS_1_2"
+        }],
+        "RoutingMode": "API_MAPPING_ONLY",
+        "Tags": {"Project": {"Ref": "ProjectName"}, "Environment": {"Ref": "Environment"}}
+      }
+    },
+    "CustomApiMapping": {
+      "Type": "AWS::ApiGatewayV2::ApiMapping",
+      "Condition": "CustomDomainEnabled",
+      "DependsOn": "DefaultStage",
+      "Properties": {
+        "ApiId": {"Ref": "HttpApiId"},
+        "DomainName": {"Ref": "CustomApiDomain"},
+        "Stage": "$default"
       }
     },
     "AllowHttpApi": {
@@ -291,15 +331,56 @@
     }
   },
   "Outputs": {
-    "McpEndpoint": {
+    "DefaultMcpEndpoint": {
       "Value": {
         "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/mcp"
       }
     },
+    "McpEndpoint": {
+      "Value": {
+        "Fn::If": [
+          "CustomDomainEnabled",
+          {"Fn::Sub": "https://${CustomDomainName}/mcp"},
+          {"Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/mcp"}
+        ]
+      }
+    },
     "GoogleRedirectUri": {
       "Value": {
-        "Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/auth/callback"
+        "Fn::If": [
+          "CustomDomainEnabled",
+          {"Fn::Sub": "https://${CustomDomainName}/auth/callback"},
+          {"Fn::Sub": "https://${HttpApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}/auth/callback"}
+        ]
       }
+    },
+    "CustomDomainRecordTarget": {
+      "Condition": "CustomDomainEnabled",
+      "Value": {"Fn::GetAtt": ["CustomApiDomain", "RegionalDomainName"]}
+    },
+    "CustomDomainHostedZoneId": {
+      "Condition": "CustomDomainEnabled",
+      "Value": {"Fn::GetAtt": ["CustomApiDomain", "RegionalHostedZoneId"]}
+    }
+  },
+  "Rules": {
+    "CustomDomainRequiresCertificate": {
+      "Assertions": [{
+        "Assert": {"Fn::Or": [
+          {"Fn::Equals": [{"Ref": "CustomDomainName"}, ""]},
+          {"Fn::Not": [{"Fn::Equals": [{"Ref": "CustomDomainCertificateArn"}, "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000"]}]}
+        ]},
+        "AssertDescription": "Set an issued Sydney ACM certificate whenever a custom hostname is configured."
+      }]
+    },
+    "CertificateRequiresCustomDomain": {
+      "Assertions": [{
+        "Assert": {"Fn::Or": [
+          {"Fn::Equals": [{"Ref": "CustomDomainCertificateArn"}, "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000"]},
+          {"Fn::Not": [{"Fn::Equals": [{"Ref": "CustomDomainName"}, ""]}]}
+        ]},
+        "AssertDescription": "A custom-domain certificate requires its matching hostname."
+      }]
     }
   },
   "Conditions": {
@@ -310,6 +391,9 @@
         },
         "true"
       ]
+    },
+    "CustomDomainEnabled": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "CustomDomainName"}, ""]}]
     }
   }
 }

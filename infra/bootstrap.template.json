@@ -571,6 +571,35 @@
                       "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
                     }
                   ]
+                },
+                {
+                  "Sid": "CreateRegionalMcpDomain",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:POST",
+                    "apigateway:PUT",
+                    "apigateway:AddCertificateToDomain"
+                  ],
+                  "Resource": {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames"},
+                  "Condition": {"StringEquals": {
+                    "apigateway:Request/EndpointType": "REGIONAL",
+                    "apigateway:Request/RoutingMode": "API_MAPPING_ONLY",
+                    "apigateway:Request/SecurityPolicy": "TLS_1_2"
+                  }}
+                },
+                {
+                  "Sid": "ManageOnlyMcpDomainAndMappings",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:DELETE",
+                    "apigateway:AddCertificateToDomain", "apigateway:RemoveCertificateFromDomain",
+                    "apigateway:TagResource", "apigateway:UntagResource"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au/*"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"}
+                  ]
                 }
               ]
             }

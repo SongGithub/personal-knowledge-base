@@ -177,6 +177,8 @@ jobs:
       GOOGLE_OWNER_SUB: ${{ secrets.KB_GOOGLE_OWNER_SUB }}
       CLIENT_REDIRECT_URIS: ${{ secrets.KB_CLIENT_REDIRECT_URIS }}
       MCP_SEED_MOCK: ${{ vars.MCP_SEED_MOCK }}
+      MCP_CUSTOM_DOMAIN_NAME: ${{ vars.MCP_CUSTOM_DOMAIN_NAME }}
+      MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN: ${{ vars.MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

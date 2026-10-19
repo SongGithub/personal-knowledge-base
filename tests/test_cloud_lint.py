@@ -39,6 +39,20 @@ class InfraLintTests(unittest.TestCase):
             self.assertEqual(len(vault_resources), 1)
             self.assertTrue(vault_resources[0].endswith("/notes/Ideas/*"))
 
+    def test_custom_domain_provisioning_is_fixed_to_mcp_hostname(self):
+        root = Path(__file__).parents[1]
+        for name in ("bootstrap.template.json", "native-pipeline.template.json"):
+            template = json.loads((root / "infra" / name).read_text())
+            policies = [resource["Properties"]["Policies"] for resource in template["Resources"].values()
+                        if resource.get("Type") == "AWS::IAM::Role" and
+                        resource["Properties"].get("RoleName", {}).get("Fn::Sub") == "${ProjectName}-${Environment}-cfn-execution"]
+            self.assertEqual(len(policies), 1)
+            statements = policies[0][0]["PolicyDocument"]["Statement"]
+            domain = next(item for item in statements
+                          if item.get("Sid") == "ManageOnlyMcpDomainAndMappings")
+            self.assertTrue(all("mcp.midu.com.au" in resource["Fn::Sub"]
+                                for resource in domain["Resource"]))
+
 
 if __name__ == "__main__":
     unittest.main()

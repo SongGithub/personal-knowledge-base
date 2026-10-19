@@ -62,6 +62,20 @@ class NativePipelineTests(unittest.TestCase):
         request = cfn.create_change_set.call_args.kwargs
         private = next(item["ParameterValue"] for item in request["Parameters"] if item["ParameterKey"] == "AuthSecretJson")
         self.assertEqual(json.loads(private)["google_client_id"], "PENDING_GOOGLE_CLIENT")
+        params = {item["ParameterKey"]: item.get("ParameterValue") for item in request["Parameters"]}
+        self.assertEqual(params["CustomDomainName"], "")
+        self.assertEqual(params["CustomDomainCertificateArn"], "")
+
+    def test_custom_domain_bootstrap_requires_matching_sydney_certificate(self):
+        session, cfn = Mock(), Mock()
+        session.client.return_value = cfn
+        cfn.describe_stacks.side_effect = ClientError(
+            {"Error": {"Code": "ValidationError", "Message": "Stack does not exist"}}, "DescribeStacks")
+        with self.assertRaisesRegex(ValueError, "configured together"):
+            bootstrap(session, "a" * 40, custom_domain_name="mcp.midu.com.au")
+        with self.assertRaisesRegex(ValueError, "owner-selected MCP hostname"):
+            bootstrap(session, "a" * 40, custom_domain_name="other.midu.com.au",
+                      custom_domain_certificate_arn="arn:aws:acm:ap-southeast-2:123456789012:certificate/abcd")
 
     def test_existing_other_bootstrap_mode_cannot_be_replaced_implicitly(self):
         session, cfn = Mock(), Mock()
