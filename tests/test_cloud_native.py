@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 
 from tools.aws_session import session_from_file
-from tools.bootstrap_native_pipeline import bootstrap, model_config_changed
+from tools.bootstrap_native_pipeline import DISABLED_DOMAIN_CERTIFICATE, bootstrap, model_config_changed
 
 
 class NativePipelineTests(unittest.TestCase):
@@ -68,7 +68,7 @@ class NativePipelineTests(unittest.TestCase):
         self.assertEqual(json.loads(private)["google_client_id"], "PENDING_GOOGLE_CLIENT")
         params = {item["ParameterKey"]: item.get("ParameterValue") for item in request["Parameters"]}
         self.assertEqual(params["CustomDomainName"], "")
-        self.assertEqual(params["CustomDomainCertificateArn"], "")
+        self.assertEqual(params["CustomDomainCertificateArn"], DISABLED_DOMAIN_CERTIFICATE)
         self.assertEqual(params["CloudflareDnsTokenSecretArn"], "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns")
 
     def test_custom_domain_bootstrap_requires_matching_sydney_certificate(self):

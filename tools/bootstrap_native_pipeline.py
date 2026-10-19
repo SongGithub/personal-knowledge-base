@@ -26,6 +26,7 @@ MODEL_CONFIG_PATHS = (
     "tests/fixtures/cloud-kb/hybrid-benchmark.json", "tools/benchmark_cloud_embeddings.py",
 )
 DISABLED_CLOUDFLARE_SECRET = "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns"
+DISABLED_DOMAIN_CERTIFICATE = "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000"
 
 
 def model_config_changed(previous_commit, source_commit, previous_model, current_model):
@@ -61,6 +62,8 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
     selected_certificate = ("" if disable_custom_domain else
                             custom_domain_certificate_arn if custom_domain_certificate_arn is not None
                             else old_parameters.get("CustomDomainCertificateArn", ""))
+    if selected_certificate == DISABLED_DOMAIN_CERTIFICATE:
+        selected_certificate = ""
     selected_cf_secret = (DISABLED_CLOUDFLARE_SECRET if disable_custom_domain else
                           cloudflare_dns_token_secret_arn if cloudflare_dns_token_secret_arn is not None
                           else old_parameters.get("CloudflareDnsTokenSecretArn", DISABLED_CLOUDFLARE_SECRET))
@@ -84,7 +87,7 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
         {"ParameterKey": "EnableMockSeeding", "ParameterValue": "true" if seed_mock else "false"},
         {"ParameterKey": "RequireDefaultWinner", "ParameterValue": "true" if require_default_winner else "false"},
         {"ParameterKey": "CustomDomainName", "ParameterValue": selected_domain},
-        {"ParameterKey": "CustomDomainCertificateArn", "ParameterValue": selected_certificate},
+        {"ParameterKey": "CustomDomainCertificateArn", "ParameterValue": selected_certificate or DISABLED_DOMAIN_CERTIFICATE},
         {"ParameterKey": "CloudflareDnsTokenSecretArn", "ParameterValue": selected_cf_secret},
     ]
     if approved_embedding_model_arn is not None:
