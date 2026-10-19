@@ -67,8 +67,8 @@
     },
     "CustomDomainCertificateArn": {
       "Type": "String",
-      "Default": "",
-      "AllowedPattern": "^$|^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$"
+      "Default": "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000",
+      "AllowedPattern": "^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$"
     },
     "CloudflareDnsTokenSecretArn": {
       "Type": "String",
@@ -1071,7 +1071,9 @@
             },
             {
               "Name": "MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN",
-              "Value": {"Ref": "CustomDomainCertificateArn"},
+              "Value": {
+                "Fn::If": ["HasCustomDomain", {"Ref": "CustomDomainCertificateArn"}, ""]
+              },
               "Type": "PLAINTEXT"
             },
             {
