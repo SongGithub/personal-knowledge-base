@@ -18,6 +18,7 @@ import uuid
 
 import boto3
 from botocore.exceptions import ClientError, WaiterError
+from cloud_kb.cloudflare import CloudflareDns, ensure_certificate_validated, verify_custom_endpoint
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,7 @@ class Deployment:
     seed_mock: bool = False
     custom_domain_name: str = ""
     custom_domain_certificate_arn: str = ""
+    cloudflare_dns_token: str = ""
 
     @classmethod
     def from_environment(cls):
@@ -49,13 +51,17 @@ class Deployment:
         certificate = os.environ.get("MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN", "").strip()
         if bool(domain) != bool(certificate):
             raise ValueError("Configure both MCP_CUSTOM_DOMAIN_NAME and its issued ACM certificate ARN")
+        cloudflare_token = os.environ.get("MCP_CLOUDFLARE_DNS_TOKEN", "").strip()
+        if domain and not cloudflare_token:
+            raise ValueError("Configure the zone-scoped Cloudflare DNS token in the pipeline secret")
         if domain and (not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+", domain)
                        or domain != "mcp.midu.com.au"):
             raise ValueError("MCP custom domain must be mcp.midu.com.au")
         if certificate and not re.fullmatch(r"arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+", certificate):
             raise ValueError("MCP custom-domain certificate must be an ACM ARN in ap-southeast-2")
         return cls(*values, seed_mock=os.environ.get("MCP_SEED_MOCK") == "true",
-                   custom_domain_name=domain, custom_domain_certificate_arn=certificate)
+                   custom_domain_name=domain, custom_domain_certificate_arn=certificate,
+                   cloudflare_dns_token=cloudflare_token)
 
 
 def outputs(cfn, stack):
@@ -114,6 +120,11 @@ def deploy(session, configuration, release):
     if not re.fullmatch(r"[a-z0-9]+", api_id):
         raise RuntimeError("Invalid anchored API identity")
     key, version, digest = upload_release(s3, foundation["ReleaseBucketName"], release)
+    cloudflare = None
+    if configuration.custom_domain_name:
+        cloudflare = CloudflareDns(configuration.cloudflare_dns_token)
+        ensure_certificate_validated(session.client("acm"), cloudflare,
+                                     configuration.custom_domain_certificate_arn)
     parameters = {
         "ProjectName": "pkb", "Environment": "dev", "HttpApiId": api_id,
         "ReleaseBucket": foundation["ReleaseBucketName"], "ReleaseKey": key, "ReleaseVersion": version,
@@ -205,7 +216,9 @@ def deploy(session, configuration, release):
         result["custom_domain"] = configuration.custom_domain_name
         result["custom_domain_record_target"] = deployed["CustomDomainRecordTarget"]
         result["google_redirect_uri"] = deployed["GoogleRedirectUri"]
-        result["custom_domain_dns"] = "pending_cloudflare_cname"
+        cloudflare.ensure_cname(configuration.custom_domain_name, deployed["CustomDomainRecordTarget"])
+        verify_custom_endpoint(endpoint)
+        result["custom_domain_dns"] = "verified_dns_only"
     return result
 
 

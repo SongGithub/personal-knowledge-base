@@ -69,6 +69,11 @@
       "Type": "String",
       "Default": "",
       "AllowedPattern": "^$|^arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+$"
+    },
+    "CloudflareDnsTokenSecretArn": {
+      "Type": "String",
+      "Default": "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns",
+      "AllowedPattern": "^arn:aws:secretsmanager:ap-southeast-2:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$"
     }
   },
   "Conditions": {
@@ -83,6 +88,9 @@
           ]
         }
       ]
+    },
+    "HasCloudflareDnsToken": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "CloudflareDnsTokenSecretArn"}, "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns"]}]
     },
     "AllowMockSeeding": {
       "Fn::And": [
@@ -856,6 +864,18 @@
                   }
                 },
                 {
+                  "Fn::If": [
+                    "HasCloudflareDnsToken",
+                    {
+                      "Sid": "ReadOnlyCloudflareDnsToken",
+                      "Effect": "Allow",
+                      "Action": "secretsmanager:GetSecretValue",
+                      "Resource": {"Ref": "CloudflareDnsTokenSecretArn"}
+                    },
+                    {"Ref": "AWS::NoValue"}
+                  ]
+                },
+                {
                   "Sid": "PrivateBuildLogs",
                   "Effect": "Allow",
                   "Action": [
@@ -1038,6 +1058,13 @@
               "Name": "MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN",
               "Value": {"Ref": "CustomDomainCertificateArn"},
               "Type": "PLAINTEXT"
+            },
+            {
+              "Fn::If": [
+                "HasCloudflareDnsToken",
+                {"Name": "MCP_CLOUDFLARE_DNS_TOKEN", "Value": {"Ref": "CloudflareDnsTokenSecretArn"}, "Type": "SECRETS_MANAGER"},
+                {"Ref": "AWS::NoValue"}
+              ]
             },
             {
               "Name": "MCP_SEED_MOCK",

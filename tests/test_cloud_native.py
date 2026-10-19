@@ -34,8 +34,10 @@ class NativePipelineTests(unittest.TestCase):
         self.assertEqual(project["ConcurrentBuildLimit"], 1)
         self.assertEqual(project["TimeoutInMinutes"], 30)
         self.assertEqual(project["SourceVersion"], {"Ref": "SourceCommit"})
-        variables = {item["Name"]: item["Value"] for item in project["Environment"]["EnvironmentVariables"]}
+        variables = {item["Name"]: item["Value"] for item in project["Environment"]["EnvironmentVariables"] if "Name" in item}
         self.assertEqual(variables["PKB_REQUIRE_DEFAULT_WINNER"], {"Ref": "RequireDefaultWinner"})
+        cloudflare_env = next(item for item in project["Environment"]["EnvironmentVariables"] if "Fn::If" in item)
+        self.assertEqual(cloudflare_env["Fn::If"][1]["Name"], "MCP_CLOUDFLARE_DNS_TOKEN")
         buildspec = Path("infra/buildspec.yml").read_text()
         self.assertIn('"${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true"', buildspec)
         self.assertIn("tools/benchmark_cloud_embeddings.py --require-default-best", buildspec)
@@ -65,17 +67,19 @@ class NativePipelineTests(unittest.TestCase):
         params = {item["ParameterKey"]: item.get("ParameterValue") for item in request["Parameters"]}
         self.assertEqual(params["CustomDomainName"], "")
         self.assertEqual(params["CustomDomainCertificateArn"], "")
+        self.assertEqual(params["CloudflareDnsTokenSecretArn"], "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns")
 
     def test_custom_domain_bootstrap_requires_matching_sydney_certificate(self):
         session, cfn = Mock(), Mock()
         session.client.return_value = cfn
         cfn.describe_stacks.side_effect = ClientError(
             {"Error": {"Code": "ValidationError", "Message": "Stack does not exist"}}, "DescribeStacks")
-        with self.assertRaisesRegex(ValueError, "configured together"):
+        with self.assertRaisesRegex(ValueError, "requires its Sydney ACM certificate"):
             bootstrap(session, "a" * 40, custom_domain_name="mcp.midu.com.au")
         with self.assertRaisesRegex(ValueError, "owner-selected MCP hostname"):
             bootstrap(session, "a" * 40, custom_domain_name="other.midu.com.au",
-                      custom_domain_certificate_arn="arn:aws:acm:ap-southeast-2:123456789012:certificate/abcd")
+                      custom_domain_certificate_arn="arn:aws:acm:ap-southeast-2:123456789012:certificate/abcd",
+                      cloudflare_dns_token_secret_arn="arn:aws:secretsmanager:ap-southeast-2:123456789012:secret:cf")
 
     def test_existing_other_bootstrap_mode_cannot_be_replaced_implicitly(self):
         session, cfn = Mock(), Mock()

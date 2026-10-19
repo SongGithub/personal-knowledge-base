@@ -25,6 +25,7 @@ MODEL_CONFIG_PATHS = (
     "cloud_kb/embeddings.py", "cloud_kb/ingestion.py", "cloud_kb/search.py",
     "tests/fixtures/cloud-kb/hybrid-benchmark.json", "tools/benchmark_cloud_embeddings.py",
 )
+DISABLED_CLOUDFLARE_SECRET = "arn:aws:secretsmanager:ap-southeast-2:000000000000:secret:disabled-cloudflare-dns"
 
 
 def model_config_changed(previous_commit, source_commit, previous_model, current_model):
@@ -40,7 +41,8 @@ def model_config_changed(previous_commit, source_commit, previous_model, current
 
 def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mock=False,
               approved_embedding_model_arn=None, custom_domain_name=None,
-              custom_domain_certificate_arn=None):
+              custom_domain_certificate_arn=None, cloudflare_dns_token_secret_arn=None,
+              disable_custom_domain=False):
     if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("Select an exact 40-character source commit")
     cfn = session.client("cloudformation")
@@ -55,16 +57,25 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
         if error.response["Error"]["Code"] != "ValidationError" or "does not exist" not in error.response["Error"].get("Message", ""):
             raise
     old_parameters = {item["ParameterKey"]: item.get("ParameterValue", "") for item in previous.get("Parameters", [])} if previous else {}
-    selected_domain = custom_domain_name if custom_domain_name is not None else old_parameters.get("CustomDomainName", "")
-    selected_certificate = (custom_domain_certificate_arn if custom_domain_certificate_arn is not None
+    selected_domain = "" if disable_custom_domain else (custom_domain_name if custom_domain_name is not None else old_parameters.get("CustomDomainName", ""))
+    selected_certificate = ("" if disable_custom_domain else
+                            custom_domain_certificate_arn if custom_domain_certificate_arn is not None
                             else old_parameters.get("CustomDomainCertificateArn", ""))
-    if bool(selected_domain) != bool(selected_certificate):
-        raise ValueError("Custom hostname and its issued ACM certificate ARN must be configured together")
+    selected_cf_secret = (DISABLED_CLOUDFLARE_SECRET if disable_custom_domain else
+                          cloudflare_dns_token_secret_arn if cloudflare_dns_token_secret_arn is not None
+                          else old_parameters.get("CloudflareDnsTokenSecretArn", DISABLED_CLOUDFLARE_SECRET))
+    if selected_domain and (not selected_certificate or selected_cf_secret == DISABLED_CLOUDFLARE_SECRET):
+        raise ValueError("Custom hostname requires its Sydney ACM certificate and Cloudflare token secret ARN")
+    if not selected_domain and (selected_certificate or selected_cf_secret != DISABLED_CLOUDFLARE_SECRET):
+        raise ValueError("Disable the custom hostname, certificate and Cloudflare token together")
     if selected_domain not in ("", "mcp.midu.com.au"):
         raise ValueError("Only the owner-selected MCP hostname is allowed")
     if selected_certificate and not re.fullmatch(
             r"arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+", selected_certificate):
         raise ValueError("Custom-domain certificate must be issued by ACM in ap-southeast-2")
+    if selected_cf_secret != DISABLED_CLOUDFLARE_SECRET and not re.fullmatch(
+            r"arn:aws:secretsmanager:ap-southeast-2:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+", selected_cf_secret):
+        raise ValueError("Cloudflare token must be stored in Secrets Manager in ap-southeast-2")
     selected_model = approved_embedding_model_arn if approved_embedding_model_arn is not None else old_parameters.get("ApprovedEmbeddingModelArn", "")
     require_default_winner = model_config_changed(old_parameters.get("SourceCommit"), source_commit,
                                                    old_parameters.get("ApprovedEmbeddingModelArn", ""), selected_model)
@@ -74,6 +85,7 @@ def bootstrap(session, source_commit, *, apply=False, start_build=False, seed_mo
         {"ParameterKey": "RequireDefaultWinner", "ParameterValue": "true" if require_default_winner else "false"},
         {"ParameterKey": "CustomDomainName", "ParameterValue": selected_domain},
         {"ParameterKey": "CustomDomainCertificateArn", "ParameterValue": selected_certificate},
+        {"ParameterKey": "CloudflareDnsTokenSecretArn", "ParameterValue": selected_cf_secret},
     ]
     if approved_embedding_model_arn is not None:
         if not re.fullmatch(r"arn:aws:bedrock:ap-southeast-2::foundation-model/cohere\.embed-multilingual-v3", approved_embedding_model_arn):
@@ -136,11 +148,16 @@ if __name__ == "__main__":
     parser.add_argument("--start-build", action="store_true")
     parser.add_argument("--seed-mock", action="store_true")
     parser.add_argument("--approved-embedding-model-arn")
-    parser.add_argument("--custom-domain-name", choices=("mcp.midu.com.au",))
+    domain_group = parser.add_mutually_exclusive_group()
+    domain_group.add_argument("--custom-domain-name", choices=("mcp.midu.com.au",))
+    domain_group.add_argument("--disable-custom-domain", action="store_true")
     parser.add_argument("--custom-domain-certificate-arn")
+    parser.add_argument("--cloudflare-dns-token-secret-arn")
     args = parser.parse_args()
     print(json.dumps(bootstrap(session_from_file(args.env_file), args.source_commit, apply=args.apply,
                                start_build=args.start_build, seed_mock=args.seed_mock,
                                approved_embedding_model_arn=args.approved_embedding_model_arn,
                                custom_domain_name=args.custom_domain_name,
-                               custom_domain_certificate_arn=args.custom_domain_certificate_arn)))
+                               custom_domain_certificate_arn=args.custom_domain_certificate_arn,
+                               cloudflare_dns_token_secret_arn=args.cloudflare_dns_token_secret_arn,
+                               disable_custom_domain=args.disable_custom_domain)))
