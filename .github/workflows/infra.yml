@@ -179,6 +179,7 @@ jobs:
       MCP_SEED_MOCK: ${{ vars.MCP_SEED_MOCK }}
       MCP_CUSTOM_DOMAIN_NAME: ${{ vars.MCP_CUSTOM_DOMAIN_NAME }}
       MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN: ${{ vars.MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN }}
+      MCP_CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_DNS }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

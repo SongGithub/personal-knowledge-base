@@ -22,12 +22,15 @@ and [API Gateway certificate requirements](https://docs.aws.amazon.com/apigatewa
    `Zone:Read` and `DNS:Edit`. Do not use the global API key. The pipeline only
    writes `mcp.midu.com.au` and ACM validation records beneath it, always with
    Cloudflare proxying disabled.
-2. Store that token as an AWS Secrets Manager secret in `ap-southeast-2`, for
-   example `pkb/dev/cloudflare-dns`. The repository helper prompts without
-   echoing it: `python3 tools/store_cloudflare_dns_token.py`. Give the pipeline the secret ARN through
-   `--cloudflare-dns-token-secret-arn`; the CodeBuild role receives only
+2. For the GitHub Actions deployment path, store the token as the repository
+   Actions secret `CLOUDFLARE_API_TOKEN_DNS`; the deploy job passes it to the
+   app without printing it. For the selected AWS-native CodeBuild path, GitHub
+   secrets are not readable by CodeBuild. Store a copy in AWS Secrets Manager
+   in `ap-southeast-2`, for example `pkb/dev/cloudflare-dns`, using
+   `python3 tools/store_cloudflare_dns_token.py`; then pass its ARN through
+   `--cloudflare-dns-token-secret-arn`. CodeBuild receives
    `secretsmanager:GetSecretValue` on that exact ARN. The token itself is never
-   a CloudFormation parameter or repository secret.
+   a CloudFormation parameter.
 3. Add `https://mcp.midu.com.au/auth/callback` to the Google OAuth web client's
    authorized redirect URIs before release.
 4. Enable the hostname by passing `--custom-domain-name mcp.midu.com.au`,
