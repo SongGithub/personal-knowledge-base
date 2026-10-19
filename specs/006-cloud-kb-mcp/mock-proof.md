@@ -1,10 +1,11 @@
 # Mock Markdown end-to-end proof
 
 **Goal**: Prove the cloud MCP is up end to end using a synthetic KB Markdown file.
-**Observed**: 2026-10-18, Australia/Melbourne. **Status**: incomplete. The native
-bootstrap, private foundation and protected MCP are deployed through CodeBuild. Google client creation,
-real owner binding, per-client grant and authenticated HTTPS retrieval remain
-required. Local tests and liveness checks do not satisfy that completion gate.
+**Observed**: 2026-10-19, Australia/Melbourne. **Status**: passed for the
+single-client synthetic read goal. The native bootstrap, private foundation and
+protected MCP are deployed through CodeBuild. Real Google OAuth, a 30-minute
+exact-note client grant and authenticated HTTPS search/fetch passed. Full feature
+acceptance, private migration and writeback remain separate work.
 
 ## Current evidence
 
@@ -18,11 +19,11 @@ required. Local tests and liveness checks do not satisfy that completion gate.
 | PR validation | [Corrected run](https://github.com/SongGithub/personal-knowledge-base/actions/runs/39061097832) passed validation, 21 runtime/operator checks, two IAM lint checks and Linux packaging | Actual GitHub runner passed |
 | Mock source/index in real S3 | Actual versioned S3 note matches fixture bytes/SHA; immutable snapshot matches its DynamoDB descriptor SHA and contains one note, marked SyntheticOnly | Actual seeding and object verification passed |
 | Deployed HTTP liveness/auth rejection | Independent HTTPS probes returned health 200 and Bearer 401 for anonymous and invalid-token requests | Actual deployed boundary passed |
-| Google identity and owner/client grant | Dedicated client form prepared; persistent credential creation awaits owner confirmation | Pending |
-| HTTPS Google-authenticated search/fetch | Exact fixture digest/content/revision must be returned through real OAuth and actual storage | Pending; goal incomplete |
+| Google identity and owner/client grant | Dedicated client created; identity-only Google sign-in verified the expected owner; credentials stored in Secrets Manager and owner binding deployed through CodeBuild | Passed: real consent and exact-note grant |
+| HTTPS Google-authenticated search/fetch | Maintained OAuth MCP client discovered both tools, searched the fixture codename and fetched exact UTF-8 bytes/SHA plus a nonempty revision from real storage | Passed in 42.289 seconds including interactive login |
 | HTTP implementation | Maintained MCP client searched/fetched exact bilingual fixture over a real loopback socket | Local layer passed with simulated AWS |
 | Access failures | Invalid/expired/wrong-audience/missing-scope tokens, different owner, revoked grants, traversal and hostile Host/Origin rejected | Synthetic signer/grants only |
-| OAuth persistence | Encrypted state recovered by a new adapter instance; expired records rejected without waiting for TTL deletion | Adapter checks passed; real OAuth state still pending |
+| OAuth persistence | Encrypted state recovered by a new adapter instance; expired records rejected without waiting for TTL deletion | Adapter checks and real OAuth callback/token exchange passed; explicit restart/refresh/revocation acceptance remains pending |
 | Lambda compatibility | Repeated Mangum API Gateway v2 invocations, including legacy `2025-11-25` initialization/tools-list | Local adapter passed |
 | Dependencies | 75 locked runtime distributions audited; zero known advisories returned | Passed at audit time; not a security guarantee |
 
@@ -85,28 +86,27 @@ The first 11-test [GitHub run](https://github.com/SongGithub/personal-knowledge-
 and later 16-test [run](https://github.com/SongGithub/personal-knowledge-base/actions/runs/39060475331)
 remain historical evidence for their own revisions.
 
-## Remaining cloud completion gate
+## Completed cloud proof procedure
 
 1. Deployment, immutable release hash, actual mock S3/index pointer, liveness and
    anonymous/invalid-token rejection are verified. Preserve these checks on the
    next configuration release; they do not prove the Google login.
-2. After owner confirmation, create the dedicated Google client with the exact
-   deployed `/auth/callback` and one-time localhost owner callback. Use
-   `tools/google_owner_subject.py` to obtain a Google-verified stable subject.
-   Store the real client secret in the existing Secrets Manager JSON, preserving
-   signing/encryption keys, and bind the verified owner through private bootstrap
-   configuration. Releasing that configuration refreshes the Lambda environment.
-3. Run `tools/verify_cloud_mcp.py` with actual owner OAuth. Its optional, separate
+2. Completed on 2026-10-19: created the approved dedicated Google client, verified
+   owner identity with `tools/google_owner_subject.py`, preserved signing/encryption
+   keys while storing real client credentials in Secrets Manager, and deployed the
+   stable owner binding through CodeBuild at `3c1bcf1657cc81c6fc7d1042f153ddd5c66b5207`.
+   The managed release succeeded; no private owner/client identifiers are recorded here.
+3. Completed: ran `tools/verify_cloud_mcp.py` with actual owner OAuth. Its optional, separate
    owner-admin step checks the deployed endpoint/owner and grants the authenticated
    SDK client only 30 minutes of read access to the exact synthetic note. It cannot
    overwrite a broader/revoked/expired existing grant. Ordinary clients receive
    no AWS credentials and login alone does not create a KB grant.
-4. Prove anonymous denial, tool discovery, codename search and exact UTF-8
-   content/SHA/revision fetch through the real HTTPS endpoint. Record actual
-   Google/pipeline/storage results before completing T033.
+4. Passed anonymous denial, tool discovery, codename search and exact UTF-8
+   content/SHA/revision fetch through the real HTTPS endpoint. T033 is complete.
 
-The application job reports `google_authenticated_read=pending_owner_verification`
-until the authenticated verifier passes. A health check cannot complete the goal.
+The deployment job reports `google_authenticated_read=pending_owner_verification`
+because it performs no browser login. The separate authenticated verifier below
+provides the completion evidence; health alone is insufficient.
 
 ## Implementation limits
 
@@ -124,3 +124,36 @@ acceptance remain separate feature work. They are not completed by this mock.
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)
 - [API Gateway v2 IAM resource/operation mapping](https://docs.aws.amazon.com/service-authorization/latest/reference/list_apigatewayv2.html)
+
+## 2026-10-19 live Google configuration
+
+Owner-approved client creation and the first Google identity consent completed.
+The Google verifier checked the expected client audience, required identity scopes,
+expiry and verified email. The private owner binding and real credentials were
+applied through the existing bootstrap's NoEcho parameters, modifying only the
+auth secret and CodeBuild project configuration. Signing/encryption keys were
+preserved. CodeBuild then deployed the real owner binding successfully. Google
+credentials are stored in AWS Secrets Manager, outside Git and deployment logs.
+
+The initial loopback verifier consent expired before completion. A fresh flow
+then completed the owner-approved MCP consent and Google identity sign-in. The
+browser reached “Authentication successful”. The verifier exited zero after:
+
+- Anonymous HTTPS MCP access was rejected.
+- Real OAuth completed through the deployed broker and Google; no auth bypass.
+- Both `search_kb` and `fetch_note` were discovered.
+- An explicit owner-admin step provisioned a new 30-minute `kb:read` grant for
+  only `Resources/MCP Demo/Mock orchard.md`, bound to the SDK's registered client.
+- Lexical search for `citrus-lantern-742` returned that note with current freshness.
+- Fetch returned exact fixture bytes, no truncation, a nonempty source revision,
+  and SHA-256 `4959b5aed7f75592894da08ae40d3ab9c104d57bf94053ceb2e8eafda3ee6cb2`.
+
+Sanitised verifier output:
+
+```json
+{"status":"passed","transport":"HTTPS MCP","auth":"OAuth","unauthenticated_denied":true,"search_and_fetch":true,"mock_sha256":"4959b5aed7f75592894da08ae40d3ab9c104d57bf94053ceb2e8eafda3ee6cb2","seconds_including_auth":42.289}
+```
+
+Client tokens were in memory only. No private vault content was uploaded. This
+completes the single-client mock read goal and T033, not the two-client bilingual,
+revocation/restart, semantic retrieval or writeback acceptance scenarios.

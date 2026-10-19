@@ -5,8 +5,8 @@
 **Created**: 2026-10-17.  
 **Current authorization**: Prove deployment permissions, deliver infrastructure
 through a pipeline, and prove the MCP end to end with mock Markdown. The foundation
-and protected mock MCP are deployed through CodeBuild. The full cloud proof remains
-and incomplete; local test doubles are not accepted as cloud deployment evidence.
+and protected mock MCP are deployed through CodeBuild. The single-client Google-authenticated mock read proof passed on 2026-10-19;
+local test doubles are not accepted as cloud deployment evidence.
 Unchecked feature/migration tasks are not claimed completed by the mock slice.
 
 ## Phase 1: Setup
@@ -83,13 +83,13 @@ full budget and privately rehearse migration/cutover without losing later writes
 - [x] T030 Exercise repeated API Gateway/Lambda invocations and encrypted OAuth-store reconstruction in `tests/test_cloud_lambda.py` and `tests/test_cloud_auth.py`.
 - [x] T031 Build a code-only Lambda release from hashed Linux wheels using `tools/build_cloud_release.py`, verify reproducible ZIP content in `tests/test_cloud_build.py`, and add synthetic checks/build to `.github/workflows/infra.yml`.
 - [x] T032 Provide bounded development-only mock seeding and a deployed OAuth client verifier in `tools/seed_mock_kb.py` and `tools/verify_cloud_mcp.py`; record local evidence and gaps in `specs/006-cloud-kb-mcp/mock-proof.md`.
-- [ ] T033 Configure approved Google identity/client access, deploy through the permitted pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
+- [x] T033 Configure approved Google identity/client access, deploy through the permitted pipeline, seed actual cloud mock objects/grant and pass the HTTPS Google-authenticated verifier; record release/run evidence in `specs/006-cloud-kb-mcp/mock-proof.md`.
 
 - [x] T034 Define an AWS-native CodeBuild alternative with exact service trust and source commit in `infra/native-pipeline.template.json`, `infra/buildspec.yml` and `tools/bootstrap_native_pipeline.py`; no IAM identity-provider operation is required.
-- [x] T035 Apply the approved native bootstrap, run the pinned managed build and verify actual stack/build/HTTP/mock-storage state. Dedicated Google client configuration and authenticated retrieval remain required by T033.
+- [x] T035 Apply the approved native bootstrap, run the pinned managed build and verify actual stack/build/HTTP/mock-storage state. Google configuration, verifier consent and authenticated retrieval passed under T033.
 
 T009–T011 have partial source implementations. Their complete
-Google/live storage/model contracts remain unproven and their markers stay open.
+two-client, full storage-policy and model contracts remain unproven; their markers stay open.
 T033 is the completion gate for the current goal; passing T029–T032 alone does
 not satisfy it. T024 supplies its application provisioning scope; T007 supplies
 the one-time trust bootstrap and foundation.
@@ -102,7 +102,7 @@ does not reduce those requirements.
 The 2026-10-18 extension includes the gated application deployment job and
 `tools/deploy_cloud_app.py`, with synthetic orchestration tests. T013/T024 denote
 authored, validated template/policy work. T035 records the actual managed AWS
-provisioning; real Google consent and the T033 proof remain incomplete.
+provisioning; real Google consent and the T033 proof passed on 2026-10-19.
 
 ## Dependencies and incremental delivery
 
@@ -120,3 +120,5 @@ provisioning; real Google consent and the T033 proof remain incomplete.
 - The later mock-proof goal explicitly authorises implementation verification.
   New synthetic adapter checks are recorded in `mock-proof.md`; existing full
   feature acceptance records remain open until their actual scope is exercised.
+
+- [x] T036 Create the owner-approved dedicated Google client, verify the stable owner identity, store credentials in AWS Secrets Manager and deploy the real owner binding through CodeBuild (2026-10-19). T033 was subsequently completed by the separate authenticated verifier.

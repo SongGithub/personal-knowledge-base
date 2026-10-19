@@ -1,7 +1,7 @@
 # Setup and acceptance guide
 
-**Status**: Updated 2026-10-18. The AWS-native bootstrap, private foundation
-and protected MCP have been deployed; the authenticated mock proof remains incomplete. Migration
+**Status**: Updated 2026-10-19. The AWS-native bootstrap, private foundation
+and protected MCP have been deployed; the single-client Google-authenticated mock search/fetch proof passed. Migration
 tools and full-feature acceptance scenarios below remain future work. See
 [deployment-access.md](deployment-access.md) for the login alternatives.
 
@@ -13,7 +13,7 @@ provider. The native SDK bootstrap does not depend on the broken local AWS CLI.
 See [permission-verification.md](permission-verification.md).
 
 For the current mock goal, see [mock-proof.md](mock-proof.md): local HTTP/Lambda
-checks passed, while the deployed Google-authenticated proof remains incomplete.
+checks and the deployed Google-authenticated search/fetch verifier passed.
 The first remote read adapter is lexical-only; semantic retrieval and writeback
 are not implemented by that slice.
 
@@ -107,6 +107,6 @@ deployment or file checksum alone does not prove a completed migration.
 - `indexed`: selected published snapshot includes the named revision.
 - `migrated`: source completeness and authority cutover are verified; no competing writer.
 
-None of the service/migration acceptance outcomes above has been executed.
-Foundation bootstrap instructions exist separately; production application
-commands await the service implementation.
+The single-client synthetic read proof is recorded in `mock-proof.md`. The broader
+service/migration acceptance sequence above remains unexecuted; it requires the
+remaining feature implementations and separate measured acceptance.
