@@ -1,0 +1,2 @@
+# Infrastructure validation only. Application dependencies are separate.
+cfn-lint==1.57.2
