@@ -1,16 +1,16 @@
 {
-  "version": "synthetic-bilingual-v1",
+  "version": "synthetic-bilingual-exact-v2",
   "notes": [
-    {"path": "Projects/Orion travel.md", "text": "# Orion travel policy\n\nStaff should take the train for trips under four hours. Air travel needs manager approval."},
+    {"path": "Projects/Orion travel.md", "text": "# Orion travel policy\n\nReference ORION-TRAVEL-47. Staff should take the train for trips under four hours. Air travel needs manager approval."},
     {"path": "Projects/Orion expenses.md", "text": "# Orion expense claims\n\nSubmit receipts within thirty days. Meals have a daily reimbursement cap."},
     {"path": "Projects/Luna backup.md", "text": "# Luna backup schedule\n\nCreate encrypted database snapshots each night and retain them for thirty days."},
-    {"path": "Projects/Luna restore.md", "text": "# Luna restoration\n\nVerify the backup checksum, restore to an isolated instance and compare row counts."},
+    {"path": "Projects/Luna restore.md", "text": "# Luna restoration\n\nReference LUNA-RESTORE-91. Verify the backup checksum, restore to an isolated instance and compare row counts."},
     {"path": "Areas/Cedar sleep.md", "text": "# Cedar bedroom sleep\n\nKeep the bedroom cool and dark. If indoor temperature stays high overnight, use air conditioning."},
     {"path": "Areas/Cedar ventilation.md", "text": "# Cedar ventilation\n\nOpen windows when outdoor air is cooler than indoor air. Use a fan to move fresh air through the room."},
-    {"path": "Resources/Maple OAuth.md", "text": "# Maple OAuth permissions\n\nGoogle sign-in establishes identity. The backend grants each AI client explicit scopes and path access."},
+    {"path": "Resources/Maple OAuth.md", "text": "# Maple OAuth permissions\n\nReference MAPLE-AUTH-63. Google sign-in establishes identity. The backend grants each AI client explicit scopes and path access."},
     {"path": "Resources/Maple search.md", "text": "# Maple knowledge search\n\nHybrid retrieval combines keyword ranking with semantic vector similarity and cites the original note."},
     {"path": "Resources/Atlas coffee.md", "text": "# Atlas coffee\n\nGrind beans immediately before brewing espresso. Adjust grind size to control extraction time."},
-    {"path": "Resources/Atlas tea.md", "text": "# Atlas tea\n\nSteep green tea with cooler water for a short time to avoid bitterness."},
+    {"path": "Resources/Atlas tea.md", "text": "# Atlas tea\n\nReference ATLAS-TEA-28. Steep green tea with cooler water for a short time to avoid bitterness."},
     {"path": "Ideas/青竹旅行.md", "text": "# 青竹旅行\n\n短途出行优先乘坐火车。长途航班需要提前审批，并保存行程凭证。"},
     {"path": "Ideas/青竹备份.md", "text": "# 青竹备份\n\n每天夜间创建加密备份，并定期验证恢复流程和文件校验和。"}
   ],
@@ -28,6 +28,10 @@
     {"query": "短途旅行应该坐什么交通工具？", "expected": "Ideas/青竹旅行.md"},
     {"query": "如何检查夜间备份能否恢复？", "expected": "Ideas/青竹备份.md"},
     {"query": "Which Chinese note requires approval before flying?", "expected": "Ideas/青竹旅行.md", "cross_language": true},
-    {"query": "Which Chinese note discusses encrypted nightly backups?", "expected": "Ideas/青竹备份.md", "cross_language": true}
+    {"query": "Which Chinese note discusses encrypted nightly backups?", "expected": "Ideas/青竹备份.md", "cross_language": true},
+    {"query": "ORION-TRAVEL-47", "expected": "Projects/Orion travel.md", "exact_match": true},
+    {"query": "LUNA-RESTORE-91", "expected": "Projects/Luna restore.md", "exact_match": true},
+    {"query": "MAPLE-AUTH-63", "expected": "Resources/Maple OAuth.md", "exact_match": true},
+    {"query": "ATLAS-TEA-28", "expected": "Resources/Atlas tea.md", "exact_match": true}
   ]
 }

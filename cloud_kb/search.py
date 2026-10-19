@@ -13,6 +13,7 @@ from cloud_kb.storage import normalize_path, permitted
 
 CONTRACT = "lexical-sqlite-v1"
 HYBRID_CONTRACT = "hybrid-sqlite-v1"
+DEFAULT_STRATEGY = "hybrid"
 MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
 STOP = set("a an and are as at be did do for from how i in is it my of on or the to was were what when why with 的 了 吗 我 是 在 有 和".split())
 AUTHORITY = {"canonical": 0, "verified": 1, "ordinary": 2, "archive": 3, "unverified": 4}
@@ -81,7 +82,7 @@ class SnapshotSearch:
         self._cached = digest, data
         return descriptor, data
 
-    def search(self, query: str, prefixes: list[str], limit: int = 5, strategy: str = "hybrid"):
+    def search(self, query: str, prefixes: list[str], limit: int = 5, strategy: str = DEFAULT_STRATEGY):
         if not isinstance(query, str) or not query.strip() or len(query) > 2000:
             raise ValueError("invalid_query")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10:

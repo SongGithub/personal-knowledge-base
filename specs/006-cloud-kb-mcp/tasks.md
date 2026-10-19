@@ -132,6 +132,8 @@ provisioning; real Google consent and the T033 proof passed on 2026-10-19.
 - [x] T041 [US3] Add a one-time private bulk index build through the reviewed pipeline and synthetic bilingual parity checks, then activate only after user-approved provider/data boundary and record evidence in `specs/006-cloud-kb-mcp/acceptance-results.md` (deployed 2026-10-19).
 - [ ] T042 [US1] Exercise deployed authenticated lexical/vector/hybrid search and fetch, freshness/deletion safety and Mac-independent serving; record actual client and bilingual results in `specs/006-cloud-kb-mcp/acceptance-results.md`.
 - [x] T043 [US3] Add deterministic hybrid/index checks to `.github/workflows/infra.yml` and a real synthetic bilingual Bedrock quality gate before deployment in `infra/buildspec.yml` and `tools/benchmark_cloud_embeddings.py`.
+- [x] T044 [US1] Compare lexical, pure-vector and default hybrid on a versioned bilingual/exact synthetic fixture when model or ranking configuration changes. Run deterministic comparison checks in GitHub PR CI and the real model/default-winner gate in trusted CodeBuild; record the observed fixture winner in `model-decision.md`.
+- [ ] T045 [US1] Choose and verify the deployed default after the v2 fixture found vector ahead of hybrid on top-one retrieval. Keep the default-winner gate enforced for subsequent model/ranking releases.
 
 T037–T042 refine T011 and T019–T023. Complete their parent markers only when
 their full original scope, including approval and deployed acceptance, is met.

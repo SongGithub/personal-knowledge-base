@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from cloud_kb.auth import GrantGate, google_provider
 from cloud_kb.config import Settings
 from cloud_kb.embeddings import BedrockEmbeddings
-from cloud_kb.search import SnapshotSearch
+from cloud_kb.search import DEFAULT_STRATEGY, SnapshotSearch
 from cloud_kb.storage import S3Notes, normalize_path, permitted
 
 
@@ -29,7 +29,7 @@ def create_app(*, auth_provider, gate, notes, search, base_url):
     annotations = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
 
     @mcp.tool(annotations=annotations)
-    async def search_kb(query: str, limit: int = 5, strategy: str = "hybrid") -> dict:
+    async def search_kb(query: str, limit: int = 5, strategy: str = DEFAULT_STRATEGY) -> dict:
         """Search permitted Markdown with lexical, vector or hybrid ranking; return current evidence."""
         prefixes = await asyncio.to_thread(gate.read_prefixes, get_access_token())
         try:

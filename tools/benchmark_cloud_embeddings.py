@@ -9,6 +9,7 @@ from contextlib import closing
 import hashlib
 from io import BytesIO
 import json
+import math
 from pathlib import Path
 import sqlite3
 import sys
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cloud_kb.embeddings import BedrockEmbeddings, CONTRACT as EMBEDDING_CONTRACT, pack
 from cloud_kb.ingestion import chunks
-from cloud_kb.search import HYBRID_CONTRACT, SnapshotSearch
+from cloud_kb.search import DEFAULT_STRATEGY, HYBRID_CONTRACT, SnapshotSearch
 from cloud_kb.storage import authority
 from tools.aws_session import session_from_file
 
@@ -79,10 +80,19 @@ def benchmark(embeddings, fixture):
                    for rows, case in zip(ranked, fixture["cases"]))
         top3 = sum(case["expected"] in [row["path"] for row in rows[:3]]
                    for rows, case in zip(ranked, fixture["cases"]))
+        reciprocal_ranks = []
+        for rows, case in zip(ranked, fixture["cases"]):
+            rank = next((position for position, row in enumerate(rows, 1)
+                         if row["path"] == case["expected"]), None)
+            reciprocal_ranks.append(1 / rank if rank else 0)
         cross = [i for i, case in enumerate(fixture["cases"]) if case.get("cross_language")]
         cross_top3 = sum(fixture["cases"][i]["expected"] in [row["path"] for row in ranked[i][:3]] for i in cross)
+        exact = [i for i, case in enumerate(fixture["cases"]) if case.get("exact_match")]
+        exact_top1 = sum(bool(ranked[i] and ranked[i][0]["path"] == fixture["cases"][i]["expected"]) for i in exact)
         results[strategy] = {"top1": top1, "top3": top3, "total": total,
-                             "cross_language_top3": cross_top3, "cross_language_total": len(cross)}
+                             "cross_language_top3": cross_top3, "cross_language_total": len(cross),
+                             "exact_top1": exact_top1, "exact_total": len(exact),
+                             "mrr": round(sum(reciprocal_ranks) / total, 4)}
     return results
 
 
@@ -90,14 +100,33 @@ def quality_gate(results):
     lexical, hybrid = results["lexical"], results["hybrid"]
     # The floor is deliberately bounded to this versioned synthetic fixture.
     # It catches missing/wrong embedding modes, vector corruption and rank drift.
-    return (hybrid["top1"] >= 10 and hybrid["top3"] >= 13 and
+    return (hybrid["total"] >= 18 and hybrid["cross_language_total"] >= 2 and
+            hybrid["exact_total"] >= 4 and
+            hybrid["top1"] >= math.ceil(.75 * hybrid["total"]) and
+            hybrid["top3"] >= math.ceil(.90 * hybrid["total"]) and
+            hybrid["exact_top1"] >= hybrid["exact_total"] - 1 and
             hybrid["cross_language_top3"] == hybrid["cross_language_total"] and
             hybrid["top1"] >= lexical["top1"] - 1)
+
+
+def compare_strategies(results, default=DEFAULT_STRATEGY):
+    """Rank the three approaches on the same judged queries, favouring top-one accuracy."""
+    if set(results) != {"lexical", "vector", "hybrid"} or default not in results:
+        raise ValueError("invalid_strategy_comparison")
+    def score(name):
+        row = results[name]
+        return (row["top1"], row["top3"], row["cross_language_top3"], row["exact_top1"], row["mrr"],
+                name == default)
+    winner = max(results, key=score)
+    return {"winner": winner, "default": default, "default_is_best": winner == default,
+            "default_top1_gap": results[winner]["top1"] - results[default]["top1"]}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", type=Path, help="Ignored local AWS credential file; omit inside trusted CodeBuild")
+    parser.add_argument("--require-default-best", action="store_true",
+                        help="Fail a model-config release when the deployed default loses the synthetic comparison")
     args = parser.parse_args()
     fixture = json.loads(FIXTURE.read_text())
     session = session_from_file(args.env_file)
@@ -106,10 +135,14 @@ def main():
     if len(stress_parts) < 2 or len(BedrockEmbeddings(session.client("bedrock-runtime")).documents(stress_parts)) != len(stress_parts):
         raise SystemExit("Long synthetic Chinese document did not embed completely")
     passed = quality_gate(result)
+    comparison = compare_strategies(result)
     print(json.dumps({"fixture": fixture["version"], "model": "cohere.embed-multilingual-v3",
-                      "region": "ap-southeast-2", "results": result, "gate": "pass" if passed else "fail"}))
+                      "region": "ap-southeast-2", "results": result, "comparison": comparison,
+                      "gate": "pass" if passed else "fail"}))
     if not passed:
         raise SystemExit("Embedding benchmark below synthetic bilingual quality floor")
+    if args.require_default_best and not comparison["default_is_best"]:
+        raise SystemExit("Default search strategy lost the synthetic comparison; review model or ranking before deployment")
 
 
 if __name__ == "__main__":

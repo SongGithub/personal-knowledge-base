@@ -2,7 +2,9 @@
 
 **Status:** Owner approved private Markdown chunks and search queries through
 Bedrock Sydney on 2026-10-19, selecting behaviour/bilingual-quality parity over
-identical bge-m3 rankings. Deployment and acceptance remain to be proven.
+identical bge-m3 rankings. The initial hybrid release and synthetic OAuth proof
+are recorded in [acceptance-results.md](acceptance-results.md); the strategy
+comparison below is under review.
 
 ## Candidate
 
@@ -30,10 +32,30 @@ promotes vector rank one to hybrid rank three when the local fusion would place
 it lower. This keeps the best lexical/hybrid first result and protects semantic
 recall. The revised live run measured lexical top-1 12/14, vector top-1 14/14,
 hybrid top-1 12/14 and hybrid top-3 14/14, including cross-language top-3 2/2.
-The trusted pipeline gate requires hybrid top-1 at least 10/14, hybrid top-3 at
-least 13/14, both cross-language results in top three, and hybrid top-1 within
-one result of lexical. Re-run this public synthetic benchmark before each model
-deployment; record the result without private data.
+The initial trusted pipeline gate required hybrid top-1 at least 10/14,
+top-3 at least 13/14 and both cross-language results in the top three.
+
+The expanded `synthetic-bilingual-exact-v2` fixture adds four exact-identifier
+queries to the prior 14 cases. A live 2026-10-19 rerun found lexical top-1
+15/18, pure vector top-1 18/18 and hybrid top-1 16/18; vector and hybrid both
+reached top-3 18/18 and cross-language top-3 2/2. Reciprocal-rank means were
+0.8611, 1.0 and 0.9259 respectively. On this small fixture, pure vector is the
+winner, so a model-configuration release cannot claim hybrid is best. The
+comparison gate evaluates the deployed default against the strongest strategy
+on the same cases and blocks a mismatched release. This is a fixture-level
+decision, not evidence that vector search is universally better on the private
+corpus. The default choice is pending owner review.
+
+The v2 minimum quality floor requires at least 18 cases, two cross-language
+cases and four exact-identifier cases; the default hybrid must reach at least
+75% top-1, 90% top-3, all cross-language top-3, all but one exact top-1, and
+remain within one top-1 result of lexical. The separate winner gate requires
+the configured default to rank first by top-1, then top-3, cross-language
+top-3, exact top-1 and mean reciprocal rank. The live synthetic comparison
+runs on every trusted CodeBuild release; the winner condition is enforced when
+the pinned commit changes the embedding, chunking, ranking or benchmark
+configuration, or when the approved model ARN changes. An unavailable Git
+comparison conservatively enables the winner condition.
 
 The Bedrock Sydney account reported retention mode `inherit` on 2026-10-19.
 This defers to the model default. AWS states that default mode may retain data

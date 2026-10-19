@@ -8,10 +8,22 @@ from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 
 from tools.aws_session import session_from_file
-from tools.bootstrap_native_pipeline import bootstrap
+from tools.bootstrap_native_pipeline import bootstrap, model_config_changed
 
 
 class NativePipelineTests(unittest.TestCase):
+    def test_model_change_detector_is_conservative(self):
+        self.assertTrue(model_config_changed(None, "b" * 40, "", "model-a"))
+        self.assertTrue(model_config_changed("a" * 40, "b" * 40, "model-a", "model-b"))
+        with patch("tools.bootstrap_native_pipeline.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = ""
+            self.assertFalse(model_config_changed("a" * 40, "b" * 40, "model-a", "model-a"))
+            run.return_value.stdout = "cloud_kb/embeddings.py\n"
+            self.assertTrue(model_config_changed("a" * 40, "b" * 40, "model-a", "model-a"))
+            run.return_value.returncode = 1
+            self.assertTrue(model_config_changed("a" * 40, "b" * 40, "model-a", "model-a"))
+
     def test_native_template_has_service_trust_and_no_identity_provider(self):
         template = json.loads(Path("infra/native-pipeline.template.json").read_text())
         types = {item["Type"] for item in template["Resources"].values()}
@@ -22,6 +34,11 @@ class NativePipelineTests(unittest.TestCase):
         self.assertEqual(project["ConcurrentBuildLimit"], 1)
         self.assertEqual(project["TimeoutInMinutes"], 30)
         self.assertEqual(project["SourceVersion"], {"Ref": "SourceCommit"})
+        variables = {item["Name"]: item["Value"] for item in project["Environment"]["EnvironmentVariables"]}
+        self.assertEqual(variables["PKB_REQUIRE_DEFAULT_WINNER"], {"Ref": "RequireDefaultWinner"})
+        buildspec = Path("infra/buildspec.yml").read_text()
+        self.assertIn('"${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true"', buildspec)
+        self.assertIn("tools/benchmark_cloud_embeddings.py --require-default-best", buildspec)
         trust = template["Resources"]["NativeBuildRole"]["Properties"]["AssumeRolePolicyDocument"]["Statement"][0]
         self.assertEqual(trust["Principal"], {"Service": "codebuild.amazonaws.com"})
         self.assertIn("aws:SourceArn", trust["Condition"]["ArnEquals"])
