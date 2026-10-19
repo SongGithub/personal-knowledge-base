@@ -15,8 +15,11 @@ See [permission-verification.md](permission-verification.md).
 For the current mock goal, see [mock-proof.md](mock-proof.md): local HTTP/Lambda
 checks and the deployed Google-authenticated search/fetch verifier passed.
 The deployed read adapter supports lexical, vector and hybrid retrieval.
-Raw capture into unverified `Ideas/` notes is implemented on a separate branch
-with synthetic checks, but is not yet deployed or available to clients.
+Raw capture is merged with synthetic checks. Local corrections support exact
+grants under `Ideas/` and `Resources/_Review/AI Learning/`, preserve retries
+after indexing, and report observed snapshot status. These corrections are not
+deployed; live persistence remains unproven. Follow the
+[writeback handoff](writeback-local-handoff.md) before any later deployment.
 
 ## Prerequisites
 

@@ -23,14 +23,24 @@ This file records aggregate checks only; private note paths and content remain o
 - T042 stays open for live freshness/deletion and offline-Mac checks. The OAuth tool checks above prove the new hybrid release for one synthetic-only client; they do not grant that client access to private notes.
 - The original feature's two-client, writeback, migration, alarm and cost acceptance tasks remain open. This release is read-only and does not establish cloud writeback or a source-of-truth cutover.
 
-## Writeback implementation evidence (not deployed)
+## Initial writeback branch evidence
 
 - The `codex/kb-writeback` change adds `capture_learning` and `get_change_status`; it writes raw Markdown under a separately granted `Ideas/` prefix, marks the note `unverified`, and relies on the existing S3 `ObjectCreated` event for asynchronous indexing.
 - Synthetic tests exercise conditional S3 creation, same-operation replay, changed-content operation-ID rejection, retry after a storage failure, separate `kb:capture` authorization, synthetic MCP HTTP persistence, and an independently authorized second client fetching the new note.
 - The API role's S3 `PutObject` permission and both runtime-permissions-boundary templates are narrowed to `notes/Ideas/*`; read access remains separately scoped by the per-client grant.
-- No private note has been written, no write grant has been created, and no write-enabled release has been deployed. The MCP remains read-only until T049 passes.
+- At the time of those branch checks, no write grant or write-enabled release had been deployed. A later prototype rollout exposed write tools and received a bounded grant, but its capture failed before persistence. The [local continuation handoff](writeback-local-handoff.md) records the failure and corrections; T049 remains open. Current remote state was not rechecked during that local-only continuation.
 
 ## Failure and correction record
+
+- The 20 October local-only continuation implemented a disabled-by-default,
+  recoverable activity-log append, with conditional writes, saved-revision
+  readback and capture-retry reconciliation. The socket-free synthetic suite
+  passed 65 checks. No live activity-log permission was added, no pipeline was
+  invoked and no deployment or live write proof was completed; see the
+  [handoff](writeback-local-handoff.md).
+- After the owner enabled local Git writes and network access, the complete
+  synthetic cloud suite passed all 66 checks, including the real loopback HTTP
+  case. This resolves the earlier sandbox restriction without excluding tests.
 
 - A mocked deployment test initially inherited CodeBuild's ingestion setting; the test was isolated and the gate rerun.
 - CloudFormation initially lacked tagging permission for its event source mapping. The execution role now permits mapping tags only with this project's requested tags, and the stack update completed.
