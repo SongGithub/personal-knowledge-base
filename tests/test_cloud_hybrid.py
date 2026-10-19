@@ -6,7 +6,7 @@ import unittest
 from botocore.exceptions import ClientError
 
 from cloud_kb.embeddings import BedrockEmbeddings, DIMENSIONS
-from cloud_kb.ingestion import ACTIVE, reconcile
+from cloud_kb.ingestion import ACTIVE, chunks, reconcile
 from cloud_kb.search import HYBRID_CONTRACT, SnapshotSearch, rank_hybrid, tokens
 from cloud_kb.storage import S3Notes
 
@@ -84,12 +84,18 @@ class FakeBedrock:
     def invoke_model(self, **request):
         body = json.loads(request["body"])
         assert body["input_type"] in {"search_document", "search_query"}
+        assert body["truncate"] == "END"
         vector = [0.0] * DIMENSIONS
         vector[0] = 3.0
         return {"body": FakeBody({"embeddings": [vector for _ in body["texts"]]})}
 
 
 class HybridTests(unittest.TestCase):
+    def test_long_chinese_document_is_split_before_embedding(self):
+        parts = chunks("跨语言知识检索与向量索引。" * 150)
+        self.assertGreater(len(parts), 1)
+        self.assertTrue(all(0 < len(part) <= 400 for part in parts))
+
     def test_bedrock_contract_and_chinese_tokens(self):
         adapter = BedrockEmbeddings(FakeBedrock())
         self.assertEqual(adapter.query("synthetic question")[0], 1.0)

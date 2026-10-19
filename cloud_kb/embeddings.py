@@ -11,7 +11,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 MODEL_ID = "cohere.embed-multilingual-v3"
 REGION = "ap-southeast-2"
 DIMENSIONS = 1024
-CONTRACT = "bedrock-cohere-multilingual-v3-f32-unit-paragraph-1500-v1"
+CONTRACT = "bedrock-cohere-multilingual-v3-f32-unit-paragraph-400-v1"
 
 
 def normalized(values):
@@ -54,7 +54,7 @@ class BedrockEmbeddings:
             raise ValueError("invalid_embedding_request")
         if any(not isinstance(text, str) or not text.strip() or len(text) > 2000 for text in texts):
             raise ValueError("embedding_input_too_long")
-        request = json.dumps({"texts": texts, "input_type": input_type, "truncate": "NONE"})
+        request = json.dumps({"texts": texts, "input_type": input_type, "truncate": "END"})
         for attempt in range(3):
             try:
                 response = self.client.invoke_model(

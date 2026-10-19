@@ -9,8 +9,10 @@ identical bge-m3 rankings. Deployment and acceptance remain to be proven.
 - Bedrock in `ap-southeast-2`, `cohere.embed-multilingual-v3`.
 - Document chunks use `search_document`; search queries use `search_query`.
 - 1,024 float32 dimensions, little-endian vector BLOBs, unit normalization,
-  `paragraph-1500-v1` chunks and contract ID
-  `bedrock-cohere-multilingual-v3-f32-unit-paragraph-1500-v1`.
+  `paragraph-400-v1` chunks and contract ID
+  `bedrock-cohere-multilingual-v3-f32-unit-paragraph-400-v1`. The smaller
+  chunks keep long Chinese passages within the model input window; `END`
+  truncation is a final provider-side safeguard.
 - The model is pay per use. The first bulk build has one-time inference cost;
   ongoing changes embed only changed Markdown, while semantic searches embed
   each query. No permanent model instance is proposed.

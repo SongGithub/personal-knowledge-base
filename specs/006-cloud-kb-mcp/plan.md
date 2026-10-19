@@ -180,7 +180,7 @@ uses `lexical-sqlite-v1`, contains only the synthetic fixture, and rejects
 
 For the initial bulk build, an AWS worker inventories `notes/*.md`, reads only
 current private S3 objects, computes SHA-256 and source VersionId, applies the
-local `paragraph-1500-v1` chunker and authority rules, and generates embeddings
+local `paragraph-400-v1` chunker and authority rules, and generates embeddings
 for each chunk. On subsequent S3 create/delete notifications, SQS invokes the
 worker; it reconciles current S3 state rather than trusting event order, reuses
 vectors for unchanged path+digest+embedding contract, and removes deleted notes.

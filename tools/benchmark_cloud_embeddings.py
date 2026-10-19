@@ -16,6 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cloud_kb.embeddings import BedrockEmbeddings, CONTRACT as EMBEDDING_CONTRACT, pack
+from cloud_kb.ingestion import chunks
 from cloud_kb.search import HYBRID_CONTRACT, SnapshotSearch
 from cloud_kb.storage import authority
 from tools.aws_session import session_from_file
@@ -56,12 +57,13 @@ def benchmark(embeddings, fixture):
         db.execute("CREATE TABLE chunks(path TEXT,ordinal INTEGER,text TEXT,vector BLOB,PRIMARY KEY(path,ordinal))")
         db.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT)")
         db.execute("INSERT INTO metadata VALUES('embedding_contract',?)", (EMBEDDING_CONTRACT,))
-        paths = list(notes)
-        vectors = embeddings.documents([notes[path] for path in paths])
-        for path, vector in zip(paths, vectors):
+        for path in notes:
             text = notes[path]
             db.execute("INSERT INTO notes VALUES(?,?,?,?)", (path, authority(path, text), hashlib.sha256(text.encode()).hexdigest(), "synthetic-v1"))
-            db.execute("INSERT INTO chunks VALUES(?,?,?,?)", (path, 0, text, pack(vector)))
+            parts = chunks(text)
+            vectors = embeddings.documents(parts)
+            db.executemany("INSERT INTO chunks VALUES(?,?,?,?)",
+                           [(path, ordinal, part, pack(vector)) for ordinal, (part, vector) in enumerate(zip(parts, vectors))])
         db.commit()
         raw = db.serialize()
     digest = hashlib.sha256(raw).hexdigest()
@@ -100,6 +102,9 @@ def main():
     fixture = json.loads(FIXTURE.read_text())
     session = session_from_file(args.env_file)
     result = benchmark(BedrockEmbeddings(session.client("bedrock-runtime")), fixture)
+    stress_parts = chunks("跨语言知识检索与向量索引。" * 150)
+    if len(stress_parts) < 2 or len(BedrockEmbeddings(session.client("bedrock-runtime")).documents(stress_parts)) != len(stress_parts):
+        raise SystemExit("Long synthetic Chinese document did not embed completely")
     passed = quality_gate(result)
     print(json.dumps({"fixture": fixture["version"], "model": "cohere.embed-multilingual-v3",
                       "region": "ap-southeast-2", "results": result, "gate": "pass" if passed else "fail"}))

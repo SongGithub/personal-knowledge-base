@@ -16,10 +16,10 @@ from cloud_kb.storage import MAX_NOTE_BYTES, authority, normalize_path
 
 
 ACTIVE = {"PK": "INDEX#ACTIVE", "SK": "SNAPSHOT"}
-CHUNKER = "paragraph-1500-v1"
+CHUNKER = "paragraph-400-v1"
 
 
-def chunks(text, limit=1500):
+def chunks(text, limit=400):
     paragraphs = re.split(r"\n\s*\n", text.strip())
     result, current = [], ""
     for paragraph in paragraphs:
