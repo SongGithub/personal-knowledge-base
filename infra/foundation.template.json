@@ -681,9 +681,14 @@
                   "Sid": "WriteKnowledgeThroughBackendPolicy",
                   "Effect": "Allow",
                   "Action": "s3:PutObject",
-                  "Resource": {
-                    "Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"
-                  }
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"
+                    },
+                    {
+                      "Fn::Sub": "${DataBucket.Arn}/notes/Resources/_Review/AI Learning/*"
+                    }
+                  ]
                 },
                 {
                   "Sid": "ReadIndex",

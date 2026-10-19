@@ -2,10 +2,25 @@
 import unittest
 import json
 
-from tools.benchmark_cloud_embeddings import FIXTURE, compare_strategies, quality_gate
+from tools.benchmark_cloud_embeddings import CachedQueryEmbeddings, FIXTURE, compare_strategies, quality_gate
 
 
 class ComparisonTests(unittest.TestCase):
+    def test_strategy_comparison_reuses_one_query_embedding(self):
+        class CountingEmbeddings:
+            def __init__(self):
+                self.calls = []
+
+            def query(self, text):
+                self.calls.append(text)
+                return [len(self.calls)]
+
+        source = CountingEmbeddings()
+        cached = CachedQueryEmbeddings(source)
+        self.assertEqual(cached.query("same query"), cached.query("same query"))
+        self.assertEqual(cached.query("other query"), [2])
+        self.assertEqual(source.calls, ["same query", "other query"])
+
     def test_fixture_covers_retrieval_failure_modes(self):
         fixture = json.loads(FIXTURE.read_text())
         self.assertGreaterEqual(len(fixture["notes"]), 20)
@@ -32,7 +47,7 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(result["winner"], "hybrid")
         self.assertTrue(result["default_is_best"])
 
-    def test_current_hybrid_fails_expanded_cross_language_floor(self):
+    def test_pre_fix_hybrid_fails_expanded_cross_language_floor(self):
         rows = {
             "lexical": {"top1": 22},
             "hybrid": {"total": 33, "top1": 25, "top3": 31,
@@ -40,6 +55,15 @@ class ComparisonTests(unittest.TestCase):
                        "exact_total": 7, "exact_top1": 6},
         }
         self.assertFalse(quality_gate(rows))
+
+    def test_semantic_shortlist_hybrid_passes_expanded_quality_floor(self):
+        rows = {
+            "lexical": {"top1": 22},
+            "hybrid": {"total": 33, "top1": 29, "top3": 33,
+                       "cross_language_total": 6, "cross_language_top3": 6,
+                       "exact_total": 7, "exact_top1": 7},
+        }
+        self.assertTrue(quality_gate(rows))
 
 
 if __name__ == "__main__":

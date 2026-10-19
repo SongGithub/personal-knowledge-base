@@ -14,6 +14,7 @@ class Settings:
     owner_sub: str
     secret_arn: str
     client_redirect_uris: tuple[str, ...]
+    activity_log_enabled: bool = False
 
     @classmethod
     def from_environment(cls):
@@ -36,4 +37,8 @@ class Settings:
             local = callback.hostname in {"127.0.0.1", "localhost", "::1"}
             if (callback.scheme != "https" and not (local and callback.scheme == "http")) or callback.fragment:
                 raise ValueError("OAuth redirects require HTTPS or an exact loopback callback")
-        return cls(**values, client_redirect_uris=tuple(redirects))
+        activity_log_enabled = os.environ.get("PKB_ACTIVITY_LOG_ENABLED", "false")
+        if activity_log_enabled not in {"true", "false"}:
+            raise ValueError("PKB_ACTIVITY_LOG_ENABLED must be true or false")
+        return cls(**values, client_redirect_uris=tuple(redirects),
+                   activity_log_enabled=activity_log_enabled == "true")

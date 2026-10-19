@@ -17,6 +17,7 @@ DEFAULT_STRATEGY = "hybrid"
 MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
 STOP = set("a an and are as at be did do for from how i in is it my of on or the to was were what when why with 的 了 吗 我 是 在 有 和".split())
 AUTHORITY = {"canonical": 0, "verified": 1, "ordinary": 2, "archive": 3, "unverified": 4}
+EXPLICIT_IDENTIFIER = re.compile(r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]+\b", re.IGNORECASE)
 
 
 def tokens(text):
@@ -32,7 +33,7 @@ def tokens(text):
     return result
 
 
-def rank_hybrid(lexical, vector, tiers):
+def rank_hybrid(lexical, vector, tiers, query=None):
     scores = defaultdict(float)
     for ranking, weight in ((lexical[:30], .25), (vector[:30], .75)):
         for rank, path in enumerate(ranking, 1):
@@ -45,12 +46,15 @@ def rank_hybrid(lexical, vector, tiers):
     rest = [path for path in fused if scores[path] < cutoff]
     near.sort(key=lambda path: (AUTHORITY[tiers[path]], -scores[path], path))
     fused = near + rest
-    # A cross-language query can have misleading lexical hits. Preserve the
-    # strongest semantic candidate in the first three without overriding rank 1.
-    if vector and vector[0] in fused and fused.index(vector[0]) >= 3:
-        fused.remove(vector[0])
-        fused.insert(2, vector[0])
-    return fused
+    # Explicit note identifiers are a lexical lookup: semantic similarity can
+    # otherwise prefer a related note that mentions the same project/topic.
+    if query and EXPLICIT_IDENTIFIER.search(query) and lexical:
+        return lexical + [path for path in fused if path not in lexical]
+    # Fusion can bury good semantic candidates when lexical terms overlap with
+    # a related but wrong note. Keep vector's first three as the high-recall
+    # semantic shortlist, then use fusion to order the remaining candidates.
+    semantic = [path for path in vector[:3] if path in fused]
+    return semantic + [path for path in fused if path not in semantic]
 
 
 class SnapshotSearch:
@@ -94,11 +98,27 @@ class SnapshotSearch:
             if strategy != "lexical":
                 raise ValueError("embedding_provider_not_configured")
             return self._legacy(query, prefixes, limit, descriptor, data)
-        if descriptor.get("EmbeddingContract") != EMBEDDING_CONTRACT:
+        if strategy != "lexical" and descriptor.get("EmbeddingContract") != EMBEDDING_CONTRACT:
             raise ValueError("incompatible_embedding_contract")
         if strategy != "lexical" and self.embeddings is None:
             raise ValueError("embedding_provider_not_configured")
         return self._hybrid(query, prefixes, limit, strategy, descriptor, data)
+
+    def indexed_sha256(self, path):
+        """Inspect the active source manifest without invoking an embedding model."""
+        path = normalize_path(path)
+        _descriptor, data = self._snapshot()
+        try:
+            with closing(sqlite3.connect(":memory:")) as db:
+                db.deserialize(data)
+                db.execute("PRAGMA trusted_schema=OFF")
+                db.execute("PRAGMA query_only=ON")
+                if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                    raise ValueError("index_integrity_failure")
+                row = db.execute("SELECT sha256 FROM notes WHERE path=?", (path,)).fetchone()
+        except sqlite3.Error:
+            raise ValueError("index_unavailable") from None
+        return row[0] if row else None
 
     def _legacy(self, query, prefixes, limit, descriptor, data):
         terms = set(re.findall(r"[\w]+", query.casefold()))
@@ -157,7 +177,8 @@ class SnapshotSearch:
                 if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
                     raise ValueError("index_integrity_failure")
                 meta = dict(db.execute("SELECT key,value FROM metadata"))
-                if meta.get("embedding_contract") != EMBEDDING_CONTRACT:
+                if (not meta.get("embedding_contract") or
+                        meta["embedding_contract"] != descriptor.get("EmbeddingContract")):
                     raise ValueError("incompatible_embedding_contract")
                 rows = db.execute("SELECT c.path,c.ordinal,c.text,c.vector,n.tier,n.sha256 "
                                   "FROM chunks c JOIN notes n USING(path) ORDER BY c.path,c.ordinal LIMIT 20001").fetchall()
@@ -198,7 +219,7 @@ class SnapshotSearch:
                 if path not in similarities or score > similarities[path][0]:
                     similarities[path] = (score, ordinal)
             vector = [path for path, _ in sorted(similarities.items(), key=lambda pair: (-pair[1][0], pair[0]))]
-        ranking = lexical if strategy == "lexical" else vector if strategy == "vector" else rank_hybrid(lexical, vector, tiers)
+        ranking = lexical if strategy == "lexical" else vector if strategy == "vector" else rank_hybrid(lexical, vector, tiers, query)
         results = []
         for path in ranking:
             if not permitted(path, prefixes):
@@ -224,5 +245,5 @@ class SnapshotSearch:
             if len(results) >= limit:
                 break
         return {"strategy": strategy, "contract": HYBRID_CONTRACT,
-                "embedding_contract": EMBEDDING_CONTRACT, "snapshot_id": descriptor.get("SnapshotId"),
+                "embedding_contract": descriptor["EmbeddingContract"], "snapshot_id": descriptor.get("SnapshotId"),
                 "results": results}

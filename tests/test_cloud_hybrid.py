@@ -1,6 +1,9 @@
 """Synthetic embedding, incremental snapshot and ranking checks for PR CI."""
 from io import BytesIO
+from contextlib import closing
+import hashlib
 import json
+import sqlite3
 import unittest
 
 from botocore.exceptions import ClientError
@@ -103,6 +106,14 @@ class HybridTests(unittest.TestCase):
         self.assertEqual(rank_hybrid(["a", "b", "c", "d"], ["d", "c", "b", "a"],
                                      {path: "ordinary" for path in "abcd"}).index("d") < 3, True)
 
+    def test_hybrid_preserves_semantic_shortlist_and_exact_identifier_lookup(self):
+        tiers = {path: "ordinary" for path in ("lexical", "semantic-1", "semantic-2", "semantic-3", "related")}
+        ranked = rank_hybrid(["lexical", "related"], ["semantic-1", "semantic-2", "semantic-3", "related"], tiers)
+        self.assertEqual(ranked[:3], ["semantic-1", "semantic-2", "semantic-3"])
+
+        ranked = rank_hybrid(["lexical", "related"], ["related", "lexical"], tiers, "MAPLE-AUTH-64")
+        self.assertEqual(ranked[0], "lexical")
+
     def test_reconcile_reuses_vectors_and_searches_all_strategies(self):
         s3, table, embeddings = FakeS3(), FakeTable(), FakeEmbeddings()
         path = "Projects/Train.md"
@@ -165,6 +176,32 @@ class HybridTests(unittest.TestCase):
         for bad in (0, 11, True):
             with self.assertRaisesRegex(ValueError, "invalid_limit"):
                 search.search("train", ["Projects/"], limit=bad)
+
+    def test_lexical_and_manifest_reads_survive_an_embedding_contract_change(self):
+        s3, table, embeddings = FakeS3(), FakeTable(), FakeEmbeddings()
+        path = "Projects/Train.md"
+        s3.objects["vault", "notes/" + path] = b"# Train\n\nTake the train to Orion."
+        reconcile(s3, table, embeddings, "vault", "indexes")
+        old_contract = "bedrock-cohere-multilingual-v3-f32-unit-paragraph-1500-v1"
+        with closing(sqlite3.connect(":memory:")) as db:
+            db.deserialize(s3.objects["indexes", table.active["Key"]])
+            db.execute("UPDATE metadata SET value=? WHERE key='embedding_contract'", (old_contract,))
+            db.commit()
+            raw = db.serialize()
+        s3.objects["indexes", table.active["Key"]] = raw
+        table.active.update(Sha256=hashlib.sha256(raw).hexdigest(), EmbeddingContract=old_contract)
+        search = SnapshotSearch(s3, "indexes", table, S3Notes(s3, "vault"), embeddings)
+        found = search.search("train", ["Projects/"], strategy="lexical")
+        self.assertEqual(found["results"][0]["path"], path)
+        self.assertEqual(found["embedding_contract"], old_contract)
+        self.assertEqual(search.indexed_sha256(path), hashlib.sha256(s3.objects["vault", "notes/" + path]).hexdigest())
+        self.assertIsNone(search.indexed_sha256("Projects/Absent.md"))
+        for strategy in ("vector", "hybrid"):
+            with self.assertRaisesRegex(ValueError, "incompatible_embedding_contract"):
+                search.search("train", ["Projects/"], strategy=strategy)
+        table.active["EmbeddingContract"] = "mismatched-descriptor"
+        with self.assertRaisesRegex(ValueError, "incompatible_embedding_contract"):
+            search.search("train", ["Projects/"], strategy="lexical")
 
 
 if __name__ == "__main__":

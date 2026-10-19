@@ -20,10 +20,10 @@ evaluation cases stay outside Git.**
 
 ## Current status
 
-Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
+Deployment snapshot: **20 October 2026**, development environment in AWS Sydney
 (`ap-southeast-2`).
 
-- The cloud MCP, private S3 note copy and full hybrid index are deployed. The
+- The cloud MCP, private S3 note storage and full hybrid index are deployed. The
   service exposes search, fetch, raw learning capture, change-status and
   access-status tools.
 - Google OAuth establishes identity. The backend separately enforces
@@ -31,6 +31,9 @@ Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
 - Desktop OAuth registration and sign-in have succeeded after adding the
   loopback callback to the allowlist. Each client still needs its own KB grant;
   a successful sign-in does not prove private-note or write access.
+- The connected Google-authenticated MCP client has passed a live capture,
+  exact-revision fetch, idempotent retry, scope denial and background-indexing
+  proof. Lexical and hybrid searches retrieve the saved synthetic note.
 - The raw API Gateway endpoint is available. The certificate for
   `mcp.midu.com.au` is issued, but the custom hostname is **not live**: API
   Gateway custom-domain creation awaits an AWS organisation permission change.
@@ -40,9 +43,9 @@ Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
   [cloud feature tasks](specs/006-cloud-kb-mcp/tasks.md).
 
 The deployed development release is pinned to
-[`4a3e114`](https://github.com/SongGithub/personal-knowledge-base/commit/4a3e114e9c291fa2dc52e0ac47ba7f9794a43ec4),
-including deployment and conditional evaluation changes tracked in
-[PR #4](https://github.com/SongGithub/personal-knowledge-base/pull/4).
+[`e0734e5`](https://github.com/SongGithub/personal-knowledge-base/commit/e0734e5088c0640dd03723b848d6c4e3459a8563),
+including the deployment/retrieval fixes from PR #4 and capture recovery in
+[PR #7](https://github.com/SongGithub/personal-knowledge-base/pull/7).
 Some older acceptance records describe earlier releases; their dated results
 are not a claim that every current acceptance task has passed.
 
@@ -88,7 +91,7 @@ retrieval behaviour and bilingual quality, rather than identical rankings.
 | --- | --- | --- |
 | `search_kb` | Search with `lexical`, `vector` or the default `hybrid` strategy | `kb:read` and permitted note paths |
 | `fetch_note` | Fetch current Markdown from S3 independently of indexing | `kb:read` and permitted note paths |
-| `capture_learning` | Create a new raw Markdown learning with provenance and an operation ID | Separate `kb:capture` grant for a specific `Ideas/` destination |
+| `capture_learning` | Create a new raw Markdown learning with provenance and an operation ID | Separate `kb:capture` grant for an exact raw-capture destination |
 | `get_change_status` | Check persistence and indexing status for a capture operation | The authenticated owner/client that owns the operation |
 | `get_access_status` | Show the caller's verified client ID, owner binding and grant state | Any authenticated client; reads no notes |
 
@@ -97,11 +100,36 @@ Capture writes a new note marked `unverified`; it does not approve or overwrite
 canonical Wiki content. Identical operation retries are idempotent, and reusing
 an operation ID with different content is rejected.
 
+The local implementation accepts granted destinations under `Ideas/` or
+`Resources/_Review/AI Learning/`. The latter matches the owner's approved
+learning-review folder. A client must supply its exact granted prefix; support
+for a folder does not grant access to it. Grant tooling supports up to 90 days
+when the owner has approved that duration.
+
 Persistence and indexing are separate outcomes. A saved note can be fetched
 before it appears in search. S3 events queue background ingestion; the worker
 chunks changed content, generates document embeddings and publishes a snapshot.
 Use `get_change_status` to inspect the operation rather than assuming that a
 successful write means indexing is complete.
+
+`get_change_status` compares the capture's SHA-256 with the active snapshot:
+`indexed` means the saved content is present, `pending` means it is absent,
+`superseded` means the path has different indexed content, and `not_checked`
+means the index could not be inspected. `operation_audit: recorded` refers to
+the durable operation record. `activity_audit: pending` means the separate
+vault activity-log append has not been confirmed. The local append component
+uses conditional writes, verifies the saved log revision and recovers on an
+identical capture retry. It is disabled by default and reports
+`activity_audit_reason: not_enabled`; the create-only client grant does not
+authorise editing that log.
+Enabling it requires separate owner authorisation, exact-path IAM permission
+and the operator-controlled `PKB_ACTIVITY_LOG_ENABLED=true` setting. Current
+infrastructure grants no activity-log write permission.
+
+The capture corrections are deployed and the live write/read/index loop passed.
+See the [deployment proof](specs/006-cloud-kb-mcp/writeback-deployment-proof.md)
+and [handoff](specs/006-cloud-kb-mcp/writeback-local-handoff.md) for the evidence
+and remaining wider acceptance work.
 
 The local MCP is read-only and exposes `search_kb` and `fetch_note`.
 

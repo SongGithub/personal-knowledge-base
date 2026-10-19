@@ -1,13 +1,14 @@
-"""Idempotent, prefix-bounded raw Markdown captures into the Ideas taxonomy."""
+"""Idempotent, prefix-bounded raw Markdown captures into approved raw-note trees."""
 from datetime import date
 import hashlib
 import json
 import re
 import time
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
-from cloud_kb.storage import normalize_path
+from cloud_kb.activity import AUDIT_CONTRACT
+from cloud_kb.storage import normalize_path, validate_capture_prefix
 
 
 MAX_TITLE = 200
@@ -49,18 +50,24 @@ def render_markdown(*, title, markdown, origin, created_date, evidence, inferenc
 
 
 class LearningWriter:
-    """Writes only new, unverified captures under a grant-configured Ideas prefix."""
+    """Writes only new, unverified captures under an exact grant-configured prefix."""
 
-    def __init__(self, s3, table, bucket):
+    def __init__(self, s3, table, bucket, indexed_sha256=None, activity_log=None):
         self.s3, self.table, self.bucket = s3, table, bucket
+        self.indexed_sha256 = indexed_sha256
+        self.activity_log = activity_log
 
     def capture(self, *, principal, client_id, operation_id, destination, title,
                 markdown, origin, created_date, evidence, inference_labels,
                 allowed_prefixes):
         if not isinstance(operation_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", operation_id):
             raise ValueError("invalid_operation_id")
-        if destination not in allowed_prefixes or not destination.startswith("Ideas/") or not destination.endswith("/"):
+        if destination not in allowed_prefixes:
             raise ValueError("forbidden")
+        try:
+            validate_capture_prefix(destination)
+        except ValueError:
+            raise ValueError("forbidden") from None
         title = _text(title, MAX_TITLE, "title")
         if any(ord(char) < 32 for char in title):
             raise ValueError("invalid_title")
@@ -95,11 +102,13 @@ class LearningWriter:
         content = render_markdown(title=title, markdown=markdown, origin=origin,
                                   created_date=created_date, evidence=evidence,
                                   inference_labels=inference_labels)
+        if len(content) > MAX_CAPTURE_BYTES:
+            raise ValueError("capture_too_large")
         content_digest = _sha(content)
         item = {**operation_key, "OperationId": operation_id, "RequestDigest": request_digest,
                 "Path": path, "ContentSha256": content_digest, "Destination": destination,
                 "State": "writing", "Persistence": "pending", "Review": "not_required",
-                "Indexing": "pending", "ActivityAudit": "recorded", "CreatedAt": int(time.time())}
+                "Indexing": "pending", "ActivityAudit": "pending", "CreatedAt": int(time.time())}
         try:
             self.table.put_item(Item=item, ConditionExpression="attribute_not_exists(PK)")
             existing = item
@@ -112,7 +121,7 @@ class LearningWriter:
             if existing.get("RequestDigest") != request_digest:
                 raise ValueError("operation_id_reused") from None
             if existing.get("Persistence") == "persisted":
-                return self._receipt(existing, replayed=True)
+                return self._finish_capture(existing, replayed=True)
 
         key = "notes/" + path
         try:
@@ -146,10 +155,38 @@ class LearningWriter:
             ExpressionAttributeValues={":persisted": "persisted", ":revision": revision,
                                        ":digest": content_digest, ":now": int(time.time())},
         )
-        return self._receipt({**item, "Persistence": "persisted", "State": "persisted",
-                              "Revision": revision}, replayed=False)
+        return self._finish_capture({**existing, "Persistence": "persisted", "State": "persisted",
+                                     "Revision": revision}, replayed=False)
 
-    def status(self, *, principal, client_id, operation_id):
+    def _finish_capture(self, item, replayed):
+        if self.activity_log is not None and not self._activity_recorded(item):
+            try:
+                audit = self.activity_log.append(item)
+            except (ValueError, RuntimeError, BotoCoreError) as error:
+                receipt = self._receipt(item, replayed)
+                receipt["activity_audit_error"] = (str(error) if isinstance(error, (ValueError, RuntimeError))
+                                                    else "activity_log_unavailable")
+                return receipt
+            try:
+                self.table.update_item(
+                    Key={"PK": item["PK"], "SK": item["SK"]},
+                    UpdateExpression="SET ActivityAudit=:recorded, ActivityAuditContract=:contract, "
+                                     "ActivityLogRevision=:audit_revision, ActivityLogSha256=:sha, UpdatedAt=:now",
+                    ConditionExpression="Persistence=:persisted AND ContentSha256=:digest",
+                    ExpressionAttributeValues={":recorded": "recorded", ":contract": audit["contract"],
+                                               ":audit_revision": audit["revision"], ":sha": audit["sha256"],
+                                               ":now": int(time.time()), ":persisted": "persisted",
+                                               ":digest": item["ContentSha256"]},
+                )
+            except (ClientError, BotoCoreError):
+                receipt = self._receipt(item, replayed)
+                receipt["activity_audit_error"] = "activity_state_unavailable"
+                return receipt
+            item = {**item, "ActivityAudit": "recorded", "ActivityAuditContract": audit["contract"],
+                    "ActivityLogRevision": audit["revision"], "ActivityLogSha256": audit["sha256"]}
+        return self._receipt(item, replayed)
+
+    def status(self, *, principal, client_id, operation_id, check_index=True):
         if not isinstance(operation_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", operation_id):
             raise ValueError("invalid_operation_id")
         key = {"PK": "OP#" + _sha((principal + "\0" + client_id).encode()),
@@ -157,7 +194,16 @@ class LearningWriter:
         item = self.table.get_item(Key=key, ConsistentRead=True).get("Item")
         if not item:
             raise ValueError("not_found")
-        return self._receipt(item, replayed=False)
+        receipt = self._receipt(item, replayed=False)
+        if check_index and item.get("Persistence") == "persisted" and self.indexed_sha256 is not None:
+            try:
+                digest = self.indexed_sha256(item["Path"])
+                receipt["indexing"] = ("indexed" if digest == item["ContentSha256"] else
+                                       "superseded" if digest is not None else "pending")
+            except (ValueError, RuntimeError, ClientError, BotoCoreError):
+                # Index trouble must not hide a durable Markdown receipt.
+                receipt["indexing"] = "not_checked"
+        return receipt
 
     def _read_existing(self, key):
         try:
@@ -168,9 +214,11 @@ class LearningWriter:
             raise RuntimeError("storage_unavailable") from None
         body = response["Body"]
         try:
-            raw = body.read(MAX_CAPTURE_BYTES)
+            raw = body.read(MAX_CAPTURE_BYTES + 1)
         finally:
             body.close()
+        if len(raw) > MAX_CAPTURE_BYTES:
+            raise ValueError("capture_too_large")
         return raw, response
 
     def _mark_retryable(self, key):
@@ -178,10 +226,23 @@ class LearningWriter:
                                ExpressionAttributeValues={":retryable": "retryable", ":now": int(time.time())})
 
     @staticmethod
-    def _receipt(item, replayed):
-        return {"operation_id": item["OperationId"], "state": item.get("State", "writing"),
-                "path": item["Path"], "revision": item.get("Revision"),
-                "sha256": item["ContentSha256"], "persistence": item.get("Persistence", "pending"),
-                "review": item.get("Review", "pending_review"),
-                "indexing": item.get("Indexing", "pending"),
-                "activity_audit": item.get("ActivityAudit", "recorded"), "replayed": replayed}
+    def _activity_recorded(item):
+        # Legacy records used 'recorded' for the DynamoDB row alone.
+        return (item.get("ActivityAudit") == "recorded" and
+                item.get("ActivityAuditContract") == AUDIT_CONTRACT and
+                bool(item.get("ActivityLogRevision")))
+
+    def _receipt(self, item, replayed):
+        audited = self._activity_recorded(item)
+        receipt = {"operation_id": item["OperationId"], "state": item.get("State", "writing"),
+                   "path": item["Path"], "revision": item.get("Revision"),
+                   "sha256": item["ContentSha256"], "persistence": item.get("Persistence", "pending"),
+                   "review": item.get("Review", "pending_review"),
+                   "indexing": item.get("Indexing", "pending"),
+                   "activity_audit": "recorded" if audited else "pending",
+                   "operation_audit": "recorded", "replayed": replayed}
+        if audited:
+            receipt["activity_log_revision"] = item["ActivityLogRevision"]
+        else:
+            receipt["activity_audit_reason"] = "pending_retry" if self.activity_log is not None else "not_enabled"
+        return receipt

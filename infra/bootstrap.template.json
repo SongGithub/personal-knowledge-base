@@ -151,6 +151,9 @@
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Ideas/*"
                 },
                 {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Resources/_Review/AI Learning/*"
+                },
+                {
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"
                 }
               ]
@@ -570,6 +573,36 @@
                     {
                       "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${HttpApiAnchor}/*"
                     }
+                  ]
+                },
+                {
+                  "Sid": "CreateRegionalMcpDomain",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:POST",
+                    "apigateway:PUT",
+                    "apigateway:AddCertificateToDomain"
+                  ],
+                  "Resource": {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames"},
+                  "Condition": {"StringEquals": {
+                    "apigateway:Request/EndpointType": "REGIONAL",
+                    "apigateway:Request/SecurityPolicy": "TLS_1_2",
+                    "aws:RequestTag/Project": {"Ref": "ProjectName"},
+                    "aws:RequestTag/Environment": {"Ref": "Environment"}
+                  }}
+                },
+                {
+                  "Sid": "ManageOnlyMcpDomainAndMappings",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:DELETE",
+                    "apigateway:AddCertificateToDomain", "apigateway:RemoveCertificateFromDomain",
+                    "apigateway:TagResource", "apigateway:UntagResource"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au/*"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/mcp.midu.com.au"}
                   ]
                 }
               ]

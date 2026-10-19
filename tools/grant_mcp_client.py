@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grant one verified owner/client bounded KB read and/or Ideas capture access.
+"""Grant one verified owner/client bounded KB read and/or raw-note capture access.
 
 This owner-run tool never prints the owner subject or client ID. It refuses to
 replace an existing grant; revoke it explicitly before creating a replacement.
@@ -13,7 +13,7 @@ import time
 import boto3
 from botocore.exceptions import ClientError
 
-from cloud_kb.storage import normalize_path
+from cloud_kb.storage import normalize_path, validate_capture_prefix
 from tools.aws_session import session_from_file
 
 
@@ -23,16 +23,14 @@ def apply_grant(session, owner_file, client_id, scopes, read_prefixes,
     subject = owner.get("sub")
     if not isinstance(subject, str) or not subject or not isinstance(client_id, str) or not client_id:
         raise ValueError("verified_owner_and_client_id_required")
-    if not 1 <= expires_hours <= 720:
+    if not 1 <= expires_hours <= 2160:
         raise ValueError("expires_hours_out_of_range")
     if not scopes or not set(scopes) <= {"kb:read", "kb:capture"}:
         raise ValueError("invalid_scopes")
     for prefix in read_prefixes:
         normalize_path(prefix.rstrip("/") + "/scope.md")
     for prefix in capture_prefixes:
-        if not prefix.startswith("Ideas/") or not prefix.endswith("/"):
-            raise ValueError("capture_scope_must_be_under_Ideas")
-        normalize_path(prefix + "scope.md")
+        validate_capture_prefix(prefix)
     if ("kb:read" in scopes) != bool(read_prefixes):
         raise ValueError("read_scope_requires_explicit_prefixes")
     if ("kb:capture" in scopes) != bool(capture_prefixes):
@@ -49,7 +47,7 @@ def apply_grant(session, owner_file, client_id, scopes, read_prefixes,
         "Scopes": sorted(set(scopes)),
         "Prefixes": sorted(set(read_prefixes)),
         "CapturePrefixes": sorted(set(capture_prefixes)),
-        "PolicyRevision": "capture-ideas-v1",
+        "PolicyRevision": "capture-raw-v2",
     }
     table = session.resource("dynamodb").Table("pkb-dev-control")
     try:

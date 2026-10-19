@@ -21,7 +21,9 @@ from botocore.exceptions import ClientError, WaiterError
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DISABLED_DOMAIN_CERTIFICATE = "arn:aws:acm:ap-southeast-2:000000000000:certificate/00000000-0000-0000-0000-000000000000"
 sys.path.insert(0, str(ROOT))
+from cloud_kb.cloudflare import CloudflareDns, ensure_certificate_validated, verify_custom_endpoint
 from tools.seed_mock_kb import publish
 
 
@@ -32,6 +34,9 @@ class Deployment:
     owner_sub: str
     redirects: str
     seed_mock: bool = False
+    custom_domain_name: str = ""
+    custom_domain_certificate_arn: str = ""
+    cloudflare_dns_token: str = ""
 
     @classmethod
     def from_environment(cls):
@@ -42,7 +47,21 @@ class Deployment:
         callbacks = json.loads(values[3])
         if not isinstance(callbacks, list) or not callbacks:
             raise ValueError("Configure exact OAuth client callbacks")
-        return cls(*values, seed_mock=os.environ.get("MCP_SEED_MOCK") == "true")
+        domain = os.environ.get("MCP_CUSTOM_DOMAIN_NAME", "").strip().lower()
+        certificate = os.environ.get("MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN", "").strip()
+        if bool(domain) != bool(certificate):
+            raise ValueError("Configure both MCP_CUSTOM_DOMAIN_NAME and its issued ACM certificate ARN")
+        cloudflare_token = os.environ.get("MCP_CLOUDFLARE_DNS_TOKEN", "").strip()
+        if domain and not cloudflare_token:
+            raise ValueError("Configure the zone-scoped Cloudflare DNS token in the pipeline secret")
+        if domain and (not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+", domain)
+                       or domain != "mcp.midu.com.au"):
+            raise ValueError("MCP custom domain must be mcp.midu.com.au")
+        if certificate and not re.fullmatch(r"arn:aws:acm:ap-southeast-2:[0-9]{12}:certificate/[a-f0-9-]+", certificate):
+            raise ValueError("MCP custom-domain certificate must be an ACM ARN in ap-southeast-2")
+        return cls(*values, seed_mock=os.environ.get("MCP_SEED_MOCK") == "true",
+                   custom_domain_name=domain, custom_domain_certificate_arn=certificate,
+                   cloudflare_dns_token=cloudflare_token)
 
 
 def outputs(cfn, stack):
@@ -79,7 +98,8 @@ def recover_empty_application(cfn, execution_role):
     """Remove only rolled-back, empty application metadata so CREATE can retry."""
     stack = "pkb-dev-application"
     allowed = {"AWS::Lambda::Function", "AWS::Lambda::Permission",
-               "AWS::ApiGatewayV2::Integration", "AWS::ApiGatewayV2::Route", "AWS::ApiGatewayV2::Stage"}
+               "AWS::ApiGatewayV2::Integration", "AWS::ApiGatewayV2::Route", "AWS::ApiGatewayV2::Stage",
+               "AWS::ApiGatewayV2::DomainName", "AWS::ApiGatewayV2::ApiMapping"}
     for page in cfn.get_paginator("list_stack_resources").paginate(StackName=stack):
         for resource in page["StackResourceSummaries"]:
             if resource["ResourceType"] not in allowed or resource["ResourceStatus"] != "DELETE_COMPLETE":
@@ -100,6 +120,11 @@ def deploy(session, configuration, release):
     if not re.fullmatch(r"[a-z0-9]+", api_id):
         raise RuntimeError("Invalid anchored API identity")
     key, version, digest = upload_release(s3, foundation["ReleaseBucketName"], release)
+    cloudflare = None
+    if configuration.custom_domain_name:
+        cloudflare = CloudflareDns(configuration.cloudflare_dns_token)
+        ensure_certificate_validated(session.client("acm"), cloudflare,
+                                     configuration.custom_domain_certificate_arn)
     parameters = {
         "ProjectName": "pkb", "Environment": "dev", "HttpApiId": api_id,
         "ReleaseBucket": foundation["ReleaseBucketName"], "ReleaseKey": key, "ReleaseVersion": version,
@@ -110,6 +135,8 @@ def deploy(session, configuration, release):
         "EnableIngestion": os.environ.get("PKB_ENABLE_INGESTION", "false"),
         "AuthSecretArn": configuration.auth_secret, "OwnerGoogleSubject": configuration.owner_sub,
         "ClientRedirectUris": configuration.redirects,
+        "CustomDomainName": configuration.custom_domain_name,
+        "CustomDomainCertificateArn": configuration.custom_domain_certificate_arn or DISABLED_DOMAIN_CERTIFICATE,
     }
     stack = "pkb-dev-application"
     kind = "UPDATE"
@@ -147,13 +174,17 @@ def deploy(session, configuration, release):
     if configuration.seed_mock:
         publish(s3, session.resource("dynamodb").Table(foundation["ControlTableName"]),
                 foundation["DataBucketName"], foundation["IndexBucketName"])
-    endpoint = outputs(cfn, stack)["McpEndpoint"]
-    if endpoint != f"https://{api_id}.execute-api.ap-southeast-2.amazonaws.com/mcp":
+    application_outputs = outputs(cfn, stack)
+    endpoint = application_outputs["McpEndpoint"]
+    expected_endpoint = (f"https://{configuration.custom_domain_name}/mcp" if configuration.custom_domain_name
+                         else f"https://{api_id}.execute-api.ap-southeast-2.amazonaws.com/mcp")
+    if endpoint != expected_endpoint:
         raise RuntimeError("Unexpected deployment endpoint")
-    with urlopen(endpoint.removesuffix("/mcp") + "/healthz", timeout=30) as health:
+    probe_endpoint = application_outputs.get("DefaultMcpEndpoint", endpoint)
+    with urlopen(probe_endpoint.removesuffix("/mcp") + "/healthz", timeout=30) as health:
         if health.status != 200 or json.loads(health.read(4096)).get("status") != "up":
             raise RuntimeError("Deployed application liveness check failed")
-    request = Request(endpoint, data=b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}',
+    request = Request(probe_endpoint, data=b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}',
                       headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
     try:
         with urlopen(request, timeout=30):
@@ -176,10 +207,19 @@ def deploy(session, configuration, release):
             time.sleep(10)
         else:
             raise RuntimeError("Cloud hybrid index did not become active within 12 minutes")
-    return {"deployment": "complete", "release_sha256": digest, "unauthenticated_denied": True,
-            "mock_seeded": configuration.seed_mock,
-            "cloud_index": "hybrid-active" if os.environ.get("PKB_ENABLE_INGESTION") == "true" else "not_checked",
-            "google_authenticated_read": "pending_owner_verification"}
+    result = {"deployment": "complete", "release_sha256": digest, "unauthenticated_denied": True,
+              "mock_seeded": configuration.seed_mock,
+              "cloud_index": "hybrid-active" if os.environ.get("PKB_ENABLE_INGESTION") == "true" else "not_checked",
+              "google_authenticated_read": "pending_owner_verification"}
+    if configuration.custom_domain_name:
+        deployed = application_outputs
+        result["custom_domain"] = configuration.custom_domain_name
+        result["custom_domain_record_target"] = deployed["CustomDomainRecordTarget"]
+        result["google_redirect_uri"] = deployed["GoogleRedirectUri"]
+        cloudflare.ensure_cname(configuration.custom_domain_name, deployed["CustomDomainRecordTarget"])
+        verify_custom_endpoint(endpoint)
+        result["custom_domain_dns"] = "verified_dns_only"
+    return result
 
 
 if __name__ == "__main__":

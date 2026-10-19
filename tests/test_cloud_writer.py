@@ -1,11 +1,12 @@
 """Synthetic idempotency and persistence checks for raw KB learning capture."""
 from contextlib import closing
 from io import BytesIO
+import time
 import unittest
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 
-from cloud_kb.writer import LearningWriter
+from cloud_kb.writer import LearningWriter, MAX_CAPTURE_BYTES
 from tools.grant_mcp_client import apply_grant
 
 
@@ -59,6 +60,11 @@ class FakeTable:
                      "Revision": values.get(":revision", item.get("Revision")),
                      "ContentSha256": values.get(":digest", item["ContentSha256"]),
                      "UpdatedAt": values[":now"]})
+        if ":audit_revision" in values:
+            assert item["Persistence"] == values[":persisted"]
+            assert item["ContentSha256"] == values[":digest"]
+            item.update(ActivityAudit=values[":recorded"], ActivityAuditContract=values[":contract"],
+                        ActivityLogRevision=values[":audit_revision"], ActivityLogSha256=values[":sha"])
 
 
 class FakeSession:
@@ -109,6 +115,8 @@ class WriterTests(unittest.TestCase):
         self.assertEqual(first["persistence"], "persisted")
         self.assertEqual(first["indexing"], "pending")
         self.assertEqual(first["review"], "not_required")
+        self.assertEqual(first["activity_audit"], "pending")
+        self.assertEqual(first["operation_audit"], "recorded")
         self.assertTrue(first["path"].startswith("Ideas/2026/10/19-"))
         stored = next(iter(self.s3.objects.values()))
         self.assertIn(b"status: unverified", stored)
@@ -141,6 +149,66 @@ class WriterTests(unittest.TestCase):
         recovered = self.writer.capture(**self.arguments)
         self.assertEqual(recovered["persistence"], "persisted")
 
+    def test_approved_review_capture_is_exact_and_existing_sources_stay_forbidden(self):
+        prefix = "Resources/_Review/AI Learning/"
+        result = self.writer.capture(**{**self.arguments, "destination": prefix, "allowed_prefixes": [prefix]})
+        self.assertTrue(result["path"].startswith(prefix))
+        for destination in ("Resources/", "Resources/_Review/Other/", "Wiki/", "Areas/",
+                            "Resources/_Review/AI Learning-secret/", "Ideas/../Wiki/"):
+            with self.subTest(destination=destination), self.assertRaises(ValueError):
+                self.writer.capture(**{**self.arguments, "destination": destination,
+                                       "allowed_prefixes": [destination]})
+        with self.assertRaisesRegex(ValueError, "forbidden"):
+            self.writer.capture(**{**self.arguments, "destination": "Ideas/", "allowed_prefixes": [prefix]})
+
+    def test_utf8_size_limit_applies_before_any_write(self):
+        with self.assertRaisesRegex(ValueError, "capture_too_large"):
+            self.writer.capture(**{**self.arguments, "markdown": "学" * 12_000})
+        self.assertEqual(self.table.items, {})
+        self.assertEqual(self.s3.objects, {})
+
+    def test_crash_after_s3_create_recovers_unicode_content_without_overwriting(self):
+        arguments = {**self.arguments, "markdown": "合成学习。" * 1000}
+        update = self.table.update_item
+        def unavailable(**_):
+            raise ClientError({"Error": {"Code": "InternalServerError"}}, "UpdateItem")
+        self.table.update_item = unavailable
+        with self.assertRaises(ClientError):
+            self.writer.capture(**arguments)
+        original = dict(self.s3.objects)
+        self.table.update_item = update
+        recovered = self.writer.capture(**arguments)
+        self.assertEqual(recovered["persistence"], "persisted")
+        self.assertEqual(self.s3.objects, original)
+
+    def test_existing_oversized_object_is_not_accepted_as_a_truncated_match(self):
+        receipt = self.writer.capture(**self.arguments)
+        key = "notes/" + receipt["path"]
+        self.s3.objects["private-vault", key] = b"x" * (MAX_CAPTURE_BYTES + 1)
+        with self.assertRaisesRegex(ValueError, "capture_too_large"):
+            self.writer._read_existing(key)
+
+    def test_status_checks_published_digest_and_keeps_receipt_when_index_is_unavailable(self):
+        receipt = self.writer.capture(**self.arguments)
+        def status():
+            return self.writer.status(principal="owner-sub", client_id="client-a", operation_id="capture-001")
+        self.writer.indexed_sha256 = lambda path: receipt["sha256"]
+        self.assertEqual(status()["indexing"], "indexed")
+        self.writer.indexed_sha256 = lambda path: None
+        self.assertEqual(status()["indexing"], "pending")
+        self.writer.indexed_sha256 = lambda path: "different-digest"
+        self.assertEqual(status()["indexing"], "superseded")
+        def unavailable(_):
+            raise ValueError("index_unavailable")
+        self.writer.indexed_sha256 = unavailable
+        self.assertEqual(status()["indexing"], "not_checked")
+        self.assertEqual(status()["persistence"], "persisted")
+        def disconnected(_):
+            raise EndpointConnectionError(endpoint_url="https://synthetic.invalid")
+        self.writer.indexed_sha256 = disconnected
+        self.assertEqual(status()["indexing"], "not_checked")
+        self.assertEqual(status()["persistence"], "persisted")
+
     def test_owner_grant_is_bounded_and_cannot_replace_active_grant(self):
         import tempfile
         from pathlib import Path
@@ -155,7 +223,13 @@ class WriterTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "grant_exists"):
                 apply_grant(FakeSession(exists=True), owner_file, "client-a", ["kb:capture"], [],
                             ["Ideas/"], 24)
-            with self.assertRaisesRegex(ValueError, "capture_scope_must_be_under_Ideas"):
+            approved = apply_grant(FakeSession(), owner_file, "client-a", ["kb:capture"], [],
+                                   ["Resources/_Review/AI Learning/"], 90 * 24)
+            self.assertEqual(approved["capture_prefixes"], ["Resources/_Review/AI Learning/"])
+            self.assertLessEqual(approved["expires_at"] - time.time(), 90 * 86400)
+            with self.assertRaisesRegex(ValueError, "expires_hours_out_of_range"):
+                apply_grant(FakeSession(), owner_file, "client-a", ["kb:capture"], [], ["Ideas/"], 2161)
+            with self.assertRaisesRegex(ValueError, "invalid_capture_destination"):
                 apply_grant(FakeSession(), owner_file, "client-a", ["kb:capture"], [],
                             ["Wiki/"], 24)
 

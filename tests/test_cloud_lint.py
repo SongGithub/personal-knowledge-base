@@ -19,15 +19,18 @@ class InfraLintTests(unittest.TestCase):
     def test_misspelled_iam_actions_still_fail(self):
         self.assertTrue(self.permissions("apigateway:TagResorce"))
 
-    def test_api_note_writes_are_limited_to_ideas(self):
+    def test_api_note_writes_are_limited_to_raw_capture_trees(self):
         template = json.loads((Path(__file__).parents[1] /
                                "infra/foundation.template.json").read_text())
         statements = template["Resources"]["ApiExecutionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
         write = next(item for item in statements if item.get("Sid") == "WriteKnowledgeThroughBackendPolicy")
         self.assertEqual(write["Action"], "s3:PutObject")
-        self.assertEqual(write["Resource"], {"Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"})
+        self.assertEqual(write["Resource"], [
+            {"Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"},
+            {"Fn::Sub": "${DataBucket.Arn}/notes/Resources/_Review/AI Learning/*"},
+        ])
 
-    def test_runtime_boundary_only_allows_note_puts_under_ideas(self):
+    def test_runtime_boundary_only_allows_note_puts_under_raw_capture_trees(self):
         root = Path(__file__).parents[1]
         for name in ("bootstrap.template.json", "native-pipeline.template.json"):
             template = json.loads((root / "infra" / name).read_text())
@@ -36,8 +39,37 @@ class InfraLintTests(unittest.TestCase):
                          if item.get("Effect") == "Allow" and item.get("Action") == "s3:PutObject")
             vault_resources = [resource["Fn::Sub"] for resource in write["Resource"]
                                if "-vault-" in resource["Fn::Sub"]]
-            self.assertEqual(len(vault_resources), 1)
-            self.assertTrue(vault_resources[0].endswith("/notes/Ideas/*"))
+            prefix = "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/"
+            self.assertEqual(set(vault_resources), {
+                prefix + "Ideas/*", prefix + "Resources/_Review/AI Learning/*",
+            })
+
+    def test_custom_domain_create_uses_supported_scoped_conditions(self):
+        root = Path(__file__).parents[1]
+        for name in ("bootstrap.template.json", "native-pipeline.template.json"):
+            template = json.loads((root / "infra" / name).read_text())
+            statements = template["Resources"]["CloudFormationExecutionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+            create = next(item for item in statements if item.get("Sid") == "CreateRegionalMcpDomain")
+            conditions = create["Condition"]["StringEquals"]
+            self.assertEqual(conditions["apigateway:Request/EndpointType"], "REGIONAL")
+            self.assertEqual(conditions["apigateway:Request/SecurityPolicy"], "TLS_1_2")
+            self.assertNotIn("apigateway:Request/RoutingMode", conditions)
+            self.assertEqual(conditions["aws:RequestTag/Project"], {"Ref": "ProjectName"})
+            self.assertEqual(conditions["aws:RequestTag/Environment"], {"Ref": "Environment"})
+
+    def test_custom_domain_provisioning_is_fixed_to_mcp_hostname(self):
+        root = Path(__file__).parents[1]
+        for name in ("bootstrap.template.json", "native-pipeline.template.json"):
+            template = json.loads((root / "infra" / name).read_text())
+            policies = [resource["Properties"]["Policies"] for resource in template["Resources"].values()
+                        if resource.get("Type") == "AWS::IAM::Role" and
+                        resource["Properties"].get("RoleName", {}).get("Fn::Sub") == "${ProjectName}-${Environment}-cfn-execution"]
+            self.assertEqual(len(policies), 1)
+            statements = policies[0][0]["PolicyDocument"]["Statement"]
+            domain = next(item for item in statements
+                          if item.get("Sid") == "ManageOnlyMcpDomainAndMappings")
+            self.assertTrue(all("mcp.midu.com.au" in resource["Fn::Sub"]
+                                for resource in domain["Resource"]))
 
 
 if __name__ == "__main__":

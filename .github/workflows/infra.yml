@@ -87,7 +87,7 @@ jobs:
           "$RUNNER_TEMP/pkb-cloud-check/bin/python" -m pip install --only-binary=:all: --disable-pip-version-check -r requirements-cloud-test.txt -c "$RUNNER_TEMP/pkb-cloud-versions.txt"
           echo "$RUNNER_TEMP/pkb-cloud-check/bin" >> "$GITHUB_PATH"
       - name: Exercise mock Markdown and access failures without AWS credentials
-        run: python3 -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_hybrid tests.test_cloud_benchmark tests.test_cloud_writer -v
+        run: python3 -m unittest tests.test_cloud_storage tests.test_cloud_auth tests.test_cloud_http tests.test_cloud_lambda tests.test_cloud_seed tests.test_cloud_deploy tests.test_cloudflare tests.test_cloud_build tests.test_cloud_native tests.test_cloud_operator tests.test_cloud_hybrid tests.test_cloud_benchmark tests.test_cloud_writer tests.test_cloud_activity -v
       - name: Build code-only Lambda release from hashed Linux wheels
         run: python3 tools/build_cloud_release.py --output "$RUNNER_TEMP/pkb-cloud-release.zip"
 
@@ -177,6 +177,9 @@ jobs:
       GOOGLE_OWNER_SUB: ${{ secrets.KB_GOOGLE_OWNER_SUB }}
       CLIENT_REDIRECT_URIS: ${{ secrets.KB_CLIENT_REDIRECT_URIS }}
       MCP_SEED_MOCK: ${{ vars.MCP_SEED_MOCK }}
+      MCP_CUSTOM_DOMAIN_NAME: ${{ vars.MCP_CUSTOM_DOMAIN_NAME }}
+      MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN: ${{ vars.MCP_CUSTOM_DOMAIN_CERTIFICATE_ARN }}
+      MCP_CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_DNS }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
