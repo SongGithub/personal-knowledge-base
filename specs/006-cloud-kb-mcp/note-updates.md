@@ -62,7 +62,7 @@ No financial note text or private client identifiers belong in this repository.
   all ordinary folders. Deployment may add only that update capability to this
   already registered/granted client, preserving expiry and other approved
   scopes, with an atomic decision audit. Future clients use the owner page.
-- Cloud KB 0.3.0 deployed successfully from `6992dcb66395`; both Lambda
+- Cloud KB 0.3.0 deployed successfully from `7d1f3860b540`; both Lambda
   hashes and all deployed source files match the immutable release artifact.
   Anonymous MCP and grant changes are denied; Google configuration is preserved.
 - The current client's explicitly approved update scope was added with an
@@ -71,7 +71,28 @@ No financial note text or private client identifiers belong in this repository.
   days. That newer browser decision is authoritative and must be preserved.
 - Live OpenClaw OAuth refresh succeeded. Its MCP catalog exposes `update_note`,
   but the old 2 RPS / 10 burst stage setting throttled connection/tool traffic.
-  Raise the bounded stage target to 5 RPS / 20 burst, keeping Lambda reserved
-  concurrency at two; rerun the authenticated synthetic update after rollout.
+  The deployed stage target is now 5 RPS / 20 burst, keeping Lambda reserved
+  concurrency at two. The subsequent authenticated synthetic update passed.
   [AWS throttling behaviour](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html).
-- A synthetic authenticated cloud update remains pending.
+- Actual OpenClaw MCP proof passed: create a synthetic note, fetch its revision
+  from structured and JSON text responses, update one passage, fetch/read back,
+  retry the identical operation, reject a stale revision, reject changed input
+  under the same operation ID, and reject a Wiki path. Persistence is confirmed;
+  indexing was pending at the immediate status check, independently reported.
+  A later MCP status returned `indexed`, and MCP lexical search found the note.
+- Independent S3/DynamoDB readback confirmed the saved version and digest, exactly
+  two object versions (capture and one update), one inserted reference, preserved
+  unrelated text, a persisted operation record and removal of pending body data.
+- Final CodeBuild: `pkb-dev-pipeline:d85825e3-ae7b-4051-b954-d4455ad54f4b`
+  succeeded. Artifact SHA-256:
+  `dc057edfad7b2406e6abc967d3def1a28af1b6c18966b6bd42640088fb6048d7`.
+  Both GitHub checks passed. The isolated infrastructure suite now has eight
+  passing checks; the separate cloud suite has 104. Private live evidence and
+  approval screenshots are retained outside Git.
+
+## Remaining boundaries
+
+Canonical/Wiki review and the Markdown activity-log append remain separate
+unfinished work. The tool reports `activity_audit: pending` / `not_enabled`;
+the DynamoDB operation audit is recorded. Ordinary-note update capability and
+owner self-service renewal are deployed and verified.

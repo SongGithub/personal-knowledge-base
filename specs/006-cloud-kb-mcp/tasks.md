@@ -4,12 +4,12 @@
 
 - [x] T058 Implement separate ordinary-note update grants, bounded exact passage edits, revision checks and durable retry/version recovery.
 - [x] T059 Diagnose the missing revision through the authenticated OpenClaw cloud client and disable its legacy local reader without deleting rollback configuration.
-- [ ] T060 Complete update security/wire/browser checks, publish/deploy, upgrade the explicitly approved OpenClaw grant while preserving expiry, and prove a synthetic live update.
+- [x] T060 Complete update security/wire/browser checks, publish/deploy, upgrade the explicitly approved OpenClaw grant while preserving expiry, and prove a synthetic live update. The owner subsequently renewed through Google for one year; see `note-updates.md`.
 
 - [x] T054 Add Google owner browser approval, explicit renewal/revocation and 90/365-day grants, keeping existing-note edits unavailable, in `cloud_kb/access.py` and `cloud_kb/grants.py`.
 - [x] T055 Add recovery links, advance renewal status, durable encrypted browser state and conditional atomic decision/audit writes.
 - [x] T056 Complete synthetic security checks, browser verification, publish/deploy and record live evidence in `self-service-access.md` (Cloud KB 0.2.1).
-- [ ] T057 Record the first real Google owner self-service approval/renewal and subsequent client retry. The owner sign-in page is live; no production grant has been automatically extended.
+- [x] T057 Record the first real Google owner self-service approval/renewal and subsequent client retry. The owner explicitly renewed read/create/update access for one year through Google; the authenticated OpenClaw update/readback passed. No grant was automatically extended.
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
 [data-model.md](data-model.md), [contracts](contracts/mcp-tools.md).  
