@@ -1,10 +1,11 @@
 # MCP tools and owner review contract
 
-**Status**: Search/fetch are deployed. Capture/status are merged, with synthetic
-HTTP acceptance. A separate prototype release exposed write tools but its live
-capture failed before persistence; see the [local handoff](../writeback-local-handoff.md).
-The corrections recorded there are not deployed. `update_note` and owner review
-remain proposed work in the current implementation.
+**Status**: Search, fetch, capture and status are deployed. The live connected
+MCP client passed capture, exact-revision fetch, retry, scope denial and indexing
+checks on 20 October 2026; see the [deployment proof](../writeback-deployment-proof.md).
+The earlier prototype failure is recorded in the [handoff](../writeback-local-handoff.md).
+Activity-log activation needs separate authorisation; `update_note` and owner
+review remain proposed work in the current implementation.
 
 ## Shared rules
 

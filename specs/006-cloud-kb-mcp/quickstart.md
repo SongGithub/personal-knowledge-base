@@ -17,9 +17,10 @@ checks and the deployed Google-authenticated search/fetch verifier passed.
 The deployed read adapter supports lexical, vector and hybrid retrieval.
 Raw capture is merged with synthetic checks. Local corrections support exact
 grants under `Ideas/` and `Resources/_Review/AI Learning/`, preserve retries
-after indexing, and report observed snapshot status. These corrections are not
-deployed; live persistence remains unproven. Follow the
-[writeback handoff](writeback-local-handoff.md) before any later deployment.
+after indexing, and report observed snapshot status. These corrections are now
+deployed: the connected MCP client passed live persistence, fetch, retry, scope
+denial and indexing checks. See the [deployment proof](writeback-deployment-proof.md)
+and [handoff](writeback-local-handoff.md) for the remaining acceptance work.
 
 ## Prerequisites
 

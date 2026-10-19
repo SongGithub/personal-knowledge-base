@@ -4,10 +4,10 @@
 
 The owner initially requested local completion only: no publication, deployment,
 email or Git commit. The subsequent instruction authorises Git commits and
-publication to GitHub. Cloud deployment and activity-log activation remain
-separate outstanding steps. No AWS, Google or KB mutation was performed during
-this continuation. Private deployment records, OAuth credentials and note
-contents remain outside this repository.
+publication to GitHub. The later goal explicitly authorised deployment and fixes
+until MCP writeback worked; that deployment and live proof are complete below.
+Activity-log activation remains separate. Private deployment records, OAuth
+credentials and note contents remain outside this repository.
 
 The initial publication attempt was blocked by the managed session: the
 checkout's `.git` was read-only, and the GitHub connector required unavailable
@@ -131,20 +131,22 @@ python -m unittest tests.test_cloud_http.CloudHTTPTests.test_mock_markdown_over_
 
 ## Outstanding
 
-1. Cloud deployment still requires a later instruction. Deploy a fresh
-   reviewed artifact and the matching foundation/boundary policies through the
-   normal pipeline; preserve existing infrastructure and the approved grant's
-   original destination, read scope and expiry. Inspect schema/grant compatibility
-   without replacing an active grant or giving the client AWS credentials.
-2. Complete T049 on the deployed release: synthetic capture, exact S3 revision
-   and digest, second-client fetch, same-operation retry, changed-input and
-   forbidden-path denials, then asynchronous indexing and search retrieval.
-   Do not equate tool discovery or a saved grant with successful persistence.
-3. Authorise and activate the locally implemented activity-log append, add its
+The [live deployment proof](writeback-deployment-proof.md) records the successful
+CodeBuild release and connected-client write/read/index loop at source
+`e0734e5088c0640dd03723b848d6c4e3459a8563`. It also confirms the original client
+scope/expiry and Google binding were preserved. Existing connector arguments
+work through explicitly bounded compatibility aliases.
+
+The new-note MCP write goal is complete. Wider feature acceptance still includes:
+
+1. Complete T049's live fetch through a second separately registered AI client.
+   The owner-operator S3 read independently proved storage persistence; it is
+   not a substitute for that separate OAuth/client interoperability case.
+2. Authorise and activate the locally implemented activity-log append, add its
    exact-path backend IAM permission, then verify live append/readback/recovery.
    Leave it disabled until that separate authority is granted. The current
    create-only scope cannot edit an existing log.
-4. Exact-revision existing-note updates and the owner review flow remain T016 /
+3. Exact-revision existing-note updates and the owner review flow remain T016 /
    T017 work. They are not required for this bounded new-note capture proof and
    must not be exposed with the client's existing capture grant.
 

@@ -20,10 +20,10 @@ evaluation cases stay outside Git.**
 
 ## Current status
 
-Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
+Deployment snapshot: **20 October 2026**, development environment in AWS Sydney
 (`ap-southeast-2`).
 
-- The cloud MCP, private S3 note copy and full hybrid index are deployed. The
+- The cloud MCP, private S3 note storage and full hybrid index are deployed. The
   service exposes search, fetch, raw learning capture, change-status and
   access-status tools.
 - Google OAuth establishes identity. The backend separately enforces
@@ -31,6 +31,9 @@ Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
 - Desktop OAuth registration and sign-in have succeeded after adding the
   loopback callback to the allowlist. Each client still needs its own KB grant;
   a successful sign-in does not prove private-note or write access.
+- The connected Google-authenticated MCP client has passed a live capture,
+  exact-revision fetch, idempotent retry, scope denial and background-indexing
+  proof. Lexical and hybrid searches retrieve the saved synthetic note.
 - The raw API Gateway endpoint is available. The certificate for
   `mcp.midu.com.au` is issued, but the custom hostname is **not live**: API
   Gateway custom-domain creation awaits an AWS organisation permission change.
@@ -40,9 +43,9 @@ Deployment snapshot: **19 October 2026**, development environment in AWS Sydney
   [cloud feature tasks](specs/006-cloud-kb-mcp/tasks.md).
 
 The deployed development release is pinned to
-[`4a3e114`](https://github.com/SongGithub/personal-knowledge-base/commit/4a3e114e9c291fa2dc52e0ac47ba7f9794a43ec4),
-including deployment and conditional evaluation changes tracked in
-[PR #4](https://github.com/SongGithub/personal-knowledge-base/pull/4).
+[`e0734e5`](https://github.com/SongGithub/personal-knowledge-base/commit/e0734e5088c0640dd03723b848d6c4e3459a8563),
+including the deployment/retrieval fixes from PR #4 and capture recovery in
+[PR #7](https://github.com/SongGithub/personal-knowledge-base/pull/7).
 Some older acceptance records describe earlier releases; their dated results
 are not a claim that every current acceptance task has passed.
 
@@ -123,9 +126,10 @@ Enabling it requires separate owner authorisation, exact-path IAM permission
 and the operator-controlled `PKB_ACTIVITY_LOG_ENABLED=true` setting. Current
 infrastructure grants no activity-log write permission.
 
-These local corrections have not been deployed. See the
-[writeback handoff](specs/006-cloud-kb-mcp/writeback-local-handoff.md) for the
-failed live attempt, local evidence and remaining deployment checks.
+The capture corrections are deployed and the live write/read/index loop passed.
+See the [deployment proof](specs/006-cloud-kb-mcp/writeback-deployment-proof.md)
+and [handoff](specs/006-cloud-kb-mcp/writeback-local-handoff.md) for the evidence
+and remaining wider acceptance work.
 
 The local MCP is read-only and exposes `search_kb` and `fetch_note`.
 

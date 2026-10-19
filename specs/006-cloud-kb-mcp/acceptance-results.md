@@ -3,6 +3,18 @@
 Date: 2026-10-19. Environment: development, AWS ap-southeast-2.
 This file records aggregate checks only; private note paths and content remain outside Git.
 
+## Live writeback update — 20 October 2026
+
+The CodeBuild release at `e0734e5088c0640dd03723b848d6c4e3459a8563` succeeded.
+The connected Google-authenticated MCP client passed new-note capture,
+exact-revision fetch, idempotent retry, changed-input rejection, forbidden-path
+denial and automatic indexing. Lexical and hybrid retrieval matched the saved
+digest, and an independent S3 read confirmed the body, encryption and one object
+version. All 78 integrated checks and the strict live model gates passed.
+See [the deployment proof](writeback-deployment-proof.md) for authoritative
+release evidence and remaining boundaries. The sections below record earlier
+releases and do not override this newer result.
+
 ## Release and quality gate
 
 - CodeBuild release pinned to commit `46037fabb56ca21749ada1303bc7fb89915de326` succeeded. The pipeline ran 26 synthetic unit tests and infrastructure lint before deployment.
