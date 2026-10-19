@@ -196,9 +196,11 @@ settings, exercise rollback/restore and confirm restricted deployment permission
   same embedding contract. A changed model requires a separate full re-embedding.
 - **FR-013b**: Pull-request CI MUST check deterministic tokenization, vector
   validation, incremental reuse, deletion safety and fusion on synthetic data.
-  The trusted deployment pipeline MUST invoke the selected real embedding model
-  on a versioned synthetic English/Chinese benchmark and stop deployment if its
-  documented quality floor fails. CI MUST NOT load the private KB or publish
+  When the pinned embedding or retrieval configuration changes, the trusted
+  deployment pipeline MUST invoke the selected real embedding model on a versioned
+  synthetic English/Chinese benchmark and stop deployment if its documented
+  quality floor fails. Unrelated releases MUST NOT invoke paid benchmark calls.
+  CI MUST NOT load the private KB or publish
   private paths, text, vectors or benchmark queries.
 - **FR-013c**: Model-configuration changes MUST compare lexical, pure-vector
   ranking and the configured default on the same versioned synthetic cases,

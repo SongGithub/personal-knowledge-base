@@ -98,11 +98,11 @@ cases and seven exact-identifier cases; the configured default must reach at lea
 75% top-1, 90% top-3, all cross-language top-3, all but one exact top-1, and
 remain within one top-1 result of lexical. The separate winner gate requires
 the configured default to rank first by top-1, then top-3, cross-language
-top-3, exact top-1 and mean reciprocal rank. The live synthetic comparison
-runs on every trusted CodeBuild release; the winner condition is enforced when
-the pinned commit changes the embedding, chunking, ranking or benchmark
-configuration, or when the approved model ARN changes. An unavailable Git
-comparison conservatively enables the winner condition.
+top-3, exact top-1 and mean reciprocal rank. The live Bedrock comparison runs
+only when the approved model ARN or pinned embedding, chunking, ranking or
+benchmark configuration changes. For those changes, the quality floor and
+winner checks are mandatory; unrelated releases skip Bedrock calls. An
+unavailable Git comparison conservatively enables both checks.
 
 The Bedrock Sydney account reported retention mode `inherit` on 2026-10-19.
 This defers to the model default. AWS states that default mode may retain data

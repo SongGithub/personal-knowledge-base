@@ -41,7 +41,8 @@ class NativePipelineTests(unittest.TestCase):
         self.assertEqual(cloudflare_env["Fn::If"][1]["Value"],
                          {"Fn::Sub": "${CloudflareDnsTokenSecretArn}:CLOUDFLARE_API_TOKEN_DNS"})
         buildspec = Path("infra/buildspec.yml").read_text()
-        self.assertIn('"${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true"', buildspec)
+        self.assertIn('[ -n "${PKB_APPROVED_EMBEDDING_MODEL_ARN:-}" ] && [ "${PKB_REQUIRE_DEFAULT_WINNER:-true}" = "true" ]', buildspec)
+        self.assertEqual(buildspec.count("tools/benchmark_cloud_embeddings.py"), 1)
         self.assertIn("tools/benchmark_cloud_embeddings.py --require-default-best", buildspec)
         trust = template["Resources"]["NativeBuildRole"]["Properties"]["AssumeRolePolicyDocument"]["Statement"][0]
         self.assertEqual(trust["Principal"], {"Service": "codebuild.amazonaws.com"})
