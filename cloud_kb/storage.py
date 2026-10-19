@@ -7,6 +7,16 @@ from botocore.exceptions import ClientError
 
 
 MAX_NOTE_BYTES = 256 * 1024
+CAPTURE_ROOTS = ("Ideas/", "Resources/_Review/AI Learning/")
+
+
+def validate_capture_prefix(prefix: str) -> str:
+    """Accept only the supported raw-capture trees; grants must narrow them."""
+    if (not isinstance(prefix, str) or not prefix.endswith("/") or
+            not prefix.startswith(CAPTURE_ROOTS)):
+        raise ValueError("invalid_capture_destination")
+    normalize_path(prefix + "scope.md")
+    return prefix
 
 
 def authority(path: str, text: str) -> str:

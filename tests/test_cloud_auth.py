@@ -72,6 +72,8 @@ class AuthStoreTests(unittest.IsolatedAsyncioTestCase):
                  "Scopes": ["kb:capture"], "CapturePrefixes": ["Ideas/"]}
         gate = GrantGate(GrantTable(grant), "owner")
         self.assertEqual(gate.capture_prefixes(Token()), ["Ideas/"])
+        grant["CapturePrefixes"] = ["Resources/_Review/AI Learning/"]
+        self.assertEqual(gate.capture_prefixes(Token()), ["Resources/_Review/AI Learning/"])
         with self.assertRaises(ToolError) as raised:
             gate.read_prefixes(Token())
         self.assertIn("missing_scope", str(raised.exception))
@@ -79,6 +81,11 @@ class AuthStoreTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError) as raised:
             gate.capture_prefixes(Token())
         self.assertIn("malformed_grant", str(raised.exception))
+        for prefix in ("Resources/", "Resources/_Review/", "Resources/_Review/AI Learning-secret/",
+                       "Ideas/../Wiki/", "Ideas//", None):
+            grant["CapturePrefixes"] = [prefix]
+            with self.subTest(prefix=prefix), self.assertRaises(ToolError):
+                gate.capture_prefixes(Token())
 
     async def test_encrypted_state_survives_adapter_restart(self):
         table = Table()

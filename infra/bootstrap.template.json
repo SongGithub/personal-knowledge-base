@@ -151,6 +151,9 @@
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Ideas/*"
                 },
                 {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/Resources/_Review/AI Learning/*"
+                },
+                {
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-indexes-${AWS::AccountId}-${AWS::Region}/indexes/*"
                 }
               ]

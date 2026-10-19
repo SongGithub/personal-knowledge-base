@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.google import GoogleProvider
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
-from cloud_kb.storage import normalize_path
+from cloud_kb.storage import validate_capture_prefix
 
 
 class DynamoOAuthStore:
@@ -183,15 +183,13 @@ class GrantGate:
                 "forbidden: missing_scope; the KB grant for OAuth client "
                 + token.client_id + " does not include kb:capture")
         prefixes = grant.get("CapturePrefixes", [])
-        if (not isinstance(prefixes, list) or not prefixes or
-                not all(isinstance(prefix, str) and prefix.startswith("Ideas/") and
-                        prefix.endswith("/") for prefix in prefixes)):
+        if not isinstance(prefixes, list) or not prefixes:
             raise ToolError(
                 "forbidden: malformed_grant; the KB grant for OAuth client "
                 + token.client_id + " has invalid capture prefixes")
         try:
             for prefix in prefixes:
-                normalize_path(prefix + "scope.md")
+                validate_capture_prefix(prefix)
         except ValueError:
             raise ToolError(
                 "forbidden: malformed_grant; the KB grant for OAuth client "

@@ -94,11 +94,27 @@ class SnapshotSearch:
             if strategy != "lexical":
                 raise ValueError("embedding_provider_not_configured")
             return self._legacy(query, prefixes, limit, descriptor, data)
-        if descriptor.get("EmbeddingContract") != EMBEDDING_CONTRACT:
+        if strategy != "lexical" and descriptor.get("EmbeddingContract") != EMBEDDING_CONTRACT:
             raise ValueError("incompatible_embedding_contract")
         if strategy != "lexical" and self.embeddings is None:
             raise ValueError("embedding_provider_not_configured")
         return self._hybrid(query, prefixes, limit, strategy, descriptor, data)
+
+    def indexed_sha256(self, path):
+        """Inspect the active source manifest without invoking an embedding model."""
+        path = normalize_path(path)
+        _descriptor, data = self._snapshot()
+        try:
+            with closing(sqlite3.connect(":memory:")) as db:
+                db.deserialize(data)
+                db.execute("PRAGMA trusted_schema=OFF")
+                db.execute("PRAGMA query_only=ON")
+                if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                    raise ValueError("index_integrity_failure")
+                row = db.execute("SELECT sha256 FROM notes WHERE path=?", (path,)).fetchone()
+        except sqlite3.Error:
+            raise ValueError("index_unavailable") from None
+        return row[0] if row else None
 
     def _legacy(self, query, prefixes, limit, descriptor, data):
         terms = set(re.findall(r"[\w]+", query.casefold()))
@@ -157,7 +173,8 @@ class SnapshotSearch:
                 if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
                     raise ValueError("index_integrity_failure")
                 meta = dict(db.execute("SELECT key,value FROM metadata"))
-                if meta.get("embedding_contract") != EMBEDDING_CONTRACT:
+                if (not meta.get("embedding_contract") or
+                        meta["embedding_contract"] != descriptor.get("EmbeddingContract")):
                     raise ValueError("incompatible_embedding_contract")
                 rows = db.execute("SELECT c.path,c.ordinal,c.text,c.vector,n.tier,n.sha256 "
                                   "FROM chunks c JOIN notes n USING(path) ORDER BY c.path,c.ordinal LIMIT 20001").fetchall()
@@ -224,5 +241,5 @@ class SnapshotSearch:
             if len(results) >= limit:
                 break
         return {"strategy": strategy, "contract": HYBRID_CONTRACT,
-                "embedding_contract": EMBEDDING_CONTRACT, "snapshot_id": descriptor.get("SnapshotId"),
+                "embedding_contract": descriptor["EmbeddingContract"], "snapshot_id": descriptor.get("SnapshotId"),
                 "results": results}

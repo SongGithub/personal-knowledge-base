@@ -12,6 +12,7 @@ from mangum import Mangum
 from starlette.responses import JSONResponse
 
 from cloud_kb.auth import GrantGate, google_provider
+from cloud_kb.activity import ActivityLog
 from cloud_kb.config import Settings
 from cloud_kb.embeddings import BedrockEmbeddings
 from cloud_kb.search import DEFAULT_STRATEGY, SnapshotSearch
@@ -57,7 +58,7 @@ def create_app(*, auth_provider, gate, notes, search, base_url, writer=None):
                                markdown: str, origin: str, created_date: str,
                                evidence: list[str] | None = None,
                                inference_labels: list[str] | None = None) -> dict:
-        """Persist a new unverified Markdown note under a granted Ideas/ destination."""
+        """Persist a new unverified Markdown note under an exact granted raw-capture destination."""
         if writer is None:
             raise ToolError("write_unavailable")
         token = get_access_token()
@@ -66,14 +67,22 @@ def create_app(*, auth_provider, gate, notes, search, base_url, writer=None):
         if destination not in prefixes:
             raise ToolError("forbidden")
         try:
-            candidates = await asyncio.to_thread(search.search, title, [destination], 10, "lexical")
-            title_line = "# " + title.strip().casefold()
-            duplicates = [row["path"] for row in candidates["results"]
-                          if any(line.strip().casefold() == title_line
-                                 for line in row.get("excerpt", "").splitlines())]
-            if duplicates:
-                return {"state": "duplicate_review", "possible_duplicates": duplicates,
-                        "persistence": "not_written"}
+            try:
+                await asyncio.to_thread(writer.status, principal=principal,
+                                        client_id=client_id, operation_id=operation_id, check_index=False)
+            except ValueError as error:
+                if str(error) != "not_found":
+                    raise
+                candidates = await asyncio.to_thread(search.search, title, [destination], 10, "lexical")
+                title_line = "# " + title.strip().casefold()
+                duplicates = [row["path"] for row in candidates["results"]
+                              if any(line.strip().casefold() == title_line
+                                     for line in row.get("excerpt", "").splitlines())]
+                if duplicates:
+                    return {"state": "duplicate_review", "possible_duplicates": duplicates,
+                            "persistence": "not_written"}
+            # Replays bypass duplicate search, which may now include this very
+            # note. The writer still verifies the full request digest.
             return await asyncio.to_thread(
                 writer.capture, principal=principal, client_id=client_id,
                 operation_id=operation_id, destination=destination, title=title,
@@ -125,12 +134,14 @@ def production_app():
     )["SecretString"])
     s3 = session.client("s3", config=sdk_config)
     notes = S3Notes(s3, settings.vault_bucket)
+    search = SnapshotSearch(s3, settings.index_bucket, table, notes,
+                            embeddings=BedrockEmbeddings(session.client("bedrock-runtime", config=sdk_config)))
     return create_app(
         auth_provider=google_provider(settings, secret, table),
         gate=GrantGate(table, settings.owner_sub), notes=notes,
-        search=SnapshotSearch(s3, settings.index_bucket, table, notes,
-                              embeddings=BedrockEmbeddings(session.client("bedrock-runtime", config=sdk_config))),
-        writer=LearningWriter(s3, table, settings.vault_bucket),
+        search=search,
+        writer=LearningWriter(s3, table, settings.vault_bucket, indexed_sha256=search.indexed_sha256,
+                              activity_log=ActivityLog(s3, settings.vault_bucket) if settings.activity_log_enabled else None),
         base_url=settings.base_url,
     )
 
