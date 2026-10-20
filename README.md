@@ -34,20 +34,20 @@ Deployment snapshot: **20 October 2026**, development environment in AWS Sydney
 - The connected Google-authenticated MCP client has passed a live capture,
   exact-revision fetch, idempotent retry, scope denial and background-indexing
   proof. Lexical and hybrid searches retrieve the saved synthetic note.
-- The raw API Gateway endpoint is available. The certificate for
-  `mcp.midu.com.au` is issued, but the custom hostname is **not live**.
-  The deployment permission blocker was resolved and live domain/mapping
-  creation verified on 20 October 2026; DNS and OAuth activation remain in
-  [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+- The MCP custom endpoint is `https://mcp.midu.com.au/mcp`. On 20 October 2026,
+  CloudFormation deployed its domain/mapping and the pipeline published its
+  DNS-only CNAME. TLS, health, anonymous/invalid-token rejection and canonical
+  OAuth metadata passed independent checks. Fresh authenticated acceptance is
+  tracked in [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
 - Copying notes to S3 and activating an index do not establish a completed
   source-of-truth cutover. Offline-device, cross-client write/read, migration,
   recovery and operational acceptance work remains tracked in the
   [cloud feature tasks](specs/006-cloud-kb-mcp/tasks.md).
 
 The deployed development release is pinned to
-[`e0734e5`](https://github.com/SongGithub/personal-knowledge-base/commit/e0734e5088c0640dd03723b848d6c4e3459a8563),
-including the deployment/retrieval fixes from PR #4 and capture recovery in
-[PR #7](https://github.com/SongGithub/personal-knowledge-base/pull/7).
+[`68ced97`](https://github.com/SongGithub/personal-knowledge-base/commit/68ced971e2d67d64b9fcfb1e6bbcdf77b27a5f38),
+including the scoped custom-domain permission fixes in
+[PR #10](https://github.com/SongGithub/personal-knowledge-base/pull/10).
 Some older acceptance records describe earlier releases; their dated results
 are not a claim that every current acceptance task has passed.
 

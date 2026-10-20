@@ -1,9 +1,31 @@
 # MCP custom domain
 
-The intended service URL is `https://mcp.midu.com.au/mcp`. The HTTP API remains
+The service URL is `https://mcp.midu.com.au/mcp`. The HTTP API remains
 in `ap-southeast-2`, with a Regional API Gateway custom domain and TLS 1.2.
 Cloudflare remains the authoritative DNS provider; the root `midu.com.au` record
 is not involved.
+
+## Activation evidence
+
+On 20 October 2026, the existing CodeBuild pipeline deployed the custom domain
+and mapping from merged commit `68ced971e2d67d64b9fcfb1e6bbcdf77b27a5f38`.
+It reads the DNS token's JSON key from the exact AWS Secrets Manager reference.
+The Google web client's custom callback is configured alongside the existing
+raw and loopback callbacks. No grants were widened by deployment.
+
+Independent checks confirm a DNS-only CNAME, a valid certificate for the
+hostname, health HTTP 200, anonymous and invalid-token HTTP 401, and custom-origin
+issuer, protected-resource and OAuth endpoint metadata. The raw endpoint still
+enforces authentication. The first build's final HTTPS check timed out during
+DNS propagation; the deployment itself reached UPDATE_COMPLETE. A pinned retry
+then completed successfully, including the pipeline's DNS and HTTPS checks.
+Fresh authenticated acceptance remains tracked in
+[UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+
+Clients should use the service URL above and reconnect through Google OAuth.
+Tokens belong to their issuer; an old-origin token is not proof of custom-origin
+access. Reusing a registered client identity preserves its existing backend grant;
+a client that registers a new identity needs separate owner approval.
 
 ## Certificate choice
 
