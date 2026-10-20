@@ -15,6 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.routing import Route
 
 from cloud_kb.grants import CAPTURE_PREFIX, GRANT_DAYS, GrantDecisions, digest
+from cloud_kb.storage import UPDATE_ROOTS
 
 
 SESSION_COOKIE = "__Host-kb-owner"
@@ -231,9 +232,12 @@ class OwnerAccess:
                 "Expired" if int(grant.get("ExpiresAt", 0)) <= time.time() else "Active")
             current = f"{state}. Expires {expiry}. Scopes: {', '.join(grant.get('Scopes', []))}."
         callbacks = "".join(f"<li><code>{escape(uri)}</code></li>" for uri in client["redirects"])
-        capture_selected = bool(grant and "kb:capture" in grant.get("Scopes", []))
-        options = ('<option value="read"' + ("" if capture_selected else " selected") + '>Read only</option>'
-                   '<option value="capture"' + (" selected" if capture_selected else "") + '>Read and create learning notes</option>')
+        selected = "write" if grant and "kb:update" in grant.get("Scopes", []) else (
+            "capture" if grant and "kb:capture" in grant.get("Scopes", []) else "read")
+        choices = [("read", "Read only"), ("capture", "Read and create learning notes"),
+                   ("write", "Read, create and update ordinary notes")]
+        options = "".join('<option value="' + value + '"' + (" selected" if value == selected else "") +
+                          '>' + label + '</option>' for value, label in choices)
         revoke = '<button name="action" value="revoke">Revoke access</button>' if grant else ""
         return page("Review client access", f"<h2>{escape(client['name'] or 'Unnamed client')}</h2>"
                     f"<p>OAuth client ID: <code>{escape(cid)}</code></p>"
@@ -241,7 +245,10 @@ class OwnerAccess:
                     f"<ul>{callbacks}</ul><p>{escape(current)}</p>"
                     '<h2>Permissions</h2><ul><li>Read all configured KB folders.</li>'
                     f'<li>Optional: create new notes only in <code>{escape(CAPTURE_PREFIX)}</code>.</li>'
-                    '<li>No permission to edit or delete existing notes.</li></ul>'
+                    '<li>Optional ordinary-note updates in: ' + escape(", ".join(UPDATE_ROOTS)) + '.</li>'
+                    '<li>Updates require a fetched revision and an exact passage match. '
+                    'Wiki, policies, verified notes and source snapshots remain protected.</li>'
+                    '<li>No permission to delete files.</li></ul>'
                     '<form method="post" action="/access">'
                     f'<input type="hidden" name="nonce" value="{nonce}">'
                     f'<label>Access <select name="mode">{options}</select></label>'
@@ -288,7 +295,7 @@ class OwnerAccess:
             return response
         if (set(form) != {"nonce", "action", "mode", "days"} or
                 form["action"] not in {"approve", "revoke"} or
-                form["mode"] not in {"read", "capture"} or form["days"] not in {str(day) for day in GRANT_DAYS}):
+                form["mode"] not in {"read", "capture", "write"} or form["days"] not in {str(day) for day in GRANT_DAYS}):
             raise AccessError("Choose one of the displayed access options.")
         cid = pending["client_id"]
         client = await self.get_client(cid)

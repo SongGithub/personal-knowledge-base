@@ -5,6 +5,7 @@ import time
 import uuid
 
 from botocore.exceptions import ClientError
+from cloud_kb.storage import UPDATE_ROOTS
 
 
 READ_PREFIXES = ("Ideas/", "Projects/", "Areas/", "Resources/", "Archive/",
@@ -30,7 +31,7 @@ class GrantDecisions:
 
     def decide(self, client_id, *, previous, action, mode, days):
         """Compare the displayed record and atomically save its decision/audit."""
-        if action not in {"approve", "revoke"} or mode not in {"read", "capture"} or days not in GRANT_DAYS:
+        if action not in {"approve", "revoke"} or mode not in {"read", "capture", "write"} or days not in GRANT_DAYS:
             raise ValueError("invalid_decision")
         if action == "revoke" and previous is None:
             raise ValueError("grant_changed")
@@ -38,10 +39,12 @@ class GrantDecisions:
         if action == "approve":
             item = {**self.key(client_id), "CreatedAt": now,
                     "ExpiresAt": now + days * 86400, "Revoked": False,
-                    "Scopes": ["kb:read"] + (["kb:capture"] if mode == "capture" else []),
+                    "Scopes": ["kb:read"] + (["kb:capture"] if mode in {"capture", "write"} else []) +
+                              (["kb:update"] if mode == "write" else []),
                     "Prefixes": sorted(READ_PREFIXES),
-                    "CapturePrefixes": [CAPTURE_PREFIX] if mode == "capture" else [],
-                    "PolicyRevision": "capture-raw-v2"}
+                    "CapturePrefixes": [CAPTURE_PREFIX] if mode in {"capture", "write"} else [],
+                    "UpdatePrefixes": list(UPDATE_ROOTS) if mode == "write" else [],
+                    "PolicyRevision": "ordinary-update-v1"}
         else:
             item = {**previous, "Revoked": True}
         item.update(GrantVersion=version, ApprovedAt=now, ApprovalMethod="owner-google-browser-v1")
@@ -68,6 +71,7 @@ class GrantDecisions:
                  "PreviousDigest": digest(previous), "ExpiresAtGrant": item["ExpiresAt"],
                  "Scopes": item["Scopes"], "Prefixes": item["Prefixes"],
                  "CapturePrefixes": item.get("CapturePrefixes", []),
+                 "UpdatePrefixes": item.get("UpdatePrefixes", []),
                  "ApprovalMethod": item["ApprovalMethod"]}
         try:
             # The DynamoDB resource client serializes native values, including

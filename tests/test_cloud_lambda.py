@@ -46,7 +46,7 @@ class LambdaAdapterTests(unittest.TestCase):
                     self.assertEqual(listed["statusCode"], 200)
                     names = {tool["name"] for tool in json.loads(listed["body"])["result"]["tools"]}
                     self.assertEqual(names, {"search_kb", "fetch_note", "capture_learning",
-                                             "get_change_status", "get_access_status"})
+                                 "get_change_status", "get_access_status", "update_note"})
                 self.assertEqual(factory.call_count, 1)
         finally:
             loop.close()

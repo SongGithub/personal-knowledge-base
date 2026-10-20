@@ -691,6 +691,41 @@
                   ]
                 },
                 {
+                  "Sid": "UpdateOrdinaryNotesConditionally",
+                  "Effect": "Allow",
+                  "Action": "s3:PutObject",
+                  "Resource": [
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Projects/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Areas/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Resources/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Personal Facts/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Templates/*"}
+                  ],
+                  "Condition": {"Null": {"s3:if-match": "false"}}
+                },
+                {
+                  "Sid": "ReadOrdinaryNoteHistoryForRecovery",
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucketVersions",
+                  "Resource": {"Fn::GetAtt": ["DataBucket", "Arn"]},
+                  "Condition": {"StringLike": {"s3:prefix": [
+                    "notes/Ideas/*", "notes/Projects/*", "notes/Areas/*",
+                    "notes/Resources/*", "notes/Personal Facts/*", "notes/Templates/*"
+                  ]}}
+                },
+                {
+                  "Sid": "ProtectPoliciesAndSourceSnapshots",
+                  "Effect": "Deny",
+                  "Action": "s3:PutObject",
+                  "Resource": [
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/AGENTS.md"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/*/AGENTS.md"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/*/Source Snapshots/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/*/Source Archives/*"}
+                  ]
+                },
+                {
                   "Sid": "ReadIndex",
                   "Effect": "Allow",
                   "Action": [

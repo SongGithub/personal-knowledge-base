@@ -25,6 +25,7 @@ from cloud_kb.access import COLLECTION, LOGIN_COOKIE, SESSION_COOKIE, STATE_PREF
 from cloud_kb.auth import DynamoOAuthStore, GrantGate, google_provider
 from cloud_kb.config import Settings
 from cloud_kb.grants import CAPTURE_PREFIX, GrantDecisions, READ_PREFIXES
+from cloud_kb.storage import UPDATE_ROOTS
 
 
 ORIGIN = "https://synthetic-kb.invalid"
@@ -181,6 +182,24 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         expired["ExpiresAt"] = int(time.time()) - 1
         self.table.put_item(Item=expired)
         self.assertEqual((await self.post(await self.form())).status_code, 200)
+
+    async def test_update_scope_requires_explicit_write_choice_and_can_be_removed(self):
+        await self.sign_in()
+        form = await self.form()
+        self.assertEqual((await self.post(form)).status_code, 200)
+        capture = self.portal.grants.get("client-one")
+        self.assertNotIn("kb:update", capture["Scopes"])
+        self.assertEqual(capture["UpdatePrefixes"], [])
+        form = await self.form()
+        form["mode"] = "write"
+        self.assertEqual((await self.post(form)).status_code, 200)
+        saved = self.portal.grants.get("client-one")
+        self.assertEqual(set(saved["Scopes"]), {"kb:read", "kb:capture", "kb:update"})
+        self.assertEqual(saved["UpdatePrefixes"], list(UPDATE_ROOTS))
+        self.assertEqual(saved["ExpiresAt"] - saved["CreatedAt"], 365 * 86400)
+        self.assertNotIn("Wiki/", saved["UpdatePrefixes"])
+        self.assertEqual((await self.post(await self.form())).status_code, 200)
+        self.assertNotIn("kb:update", self.portal.grants.get("client-one")["Scopes"])
 
     async def test_no_owner_cookie_or_mcp_bearer_can_approve(self):
         response = await self.http.post("/access", data={"nonce": secrets.token_urlsafe(32)},
