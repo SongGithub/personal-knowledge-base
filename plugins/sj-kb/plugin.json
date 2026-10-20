@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sj-kb",
+  "version": "0.1.0",
+  "description": "Search and retrieve private KB notes, capture learning and make revision-checked updates through owner-approved access.",
+  "author": { "name": "Song Jin" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "sj-kb",
+        "shortDescription": "Your private knowledge base",
+        "longDescription": "Connect to the private knowledge service at mcp.midu.com.au using Google sign-in. Search, fetch, capture and update permissions are controlled by a separate owner-approved grant for each client.",
+        "developerName": "Song Jin",
+        "category": "Productivity",
+        "defaultPrompt": "Use sj-kb to check my access, then search my knowledge base for the topic I provide."
+      }
+    }
+  }
+}

@@ -41,6 +41,48 @@ Tokens belong to their issuer; an old-origin token is not proof of custom-origin
 access. Reusing a registered client identity preserves its existing backend grant;
 a client that registers a new identity needs separate owner approval.
 
+## ChatGPT web and mobile
+
+Codex's local MCP configuration does not create a ChatGPT connection. The
+portable package in [`plugins/sj-kb`](../plugins/sj-kb/) defines the existing
+HTTPS endpoint with OAuth dynamic client registration (DCR). It contains no
+credentials or private notes. A portable package alone may show a desktop
+install path; verify the actual installation surface before claiming mobile
+availability.
+
+For ChatGPT, open Plugins on the web, choose Add custom MCP server, enter
+`https://mcp.midu.com.au/mcp`, and select OAuth with DCR. Use the resulting
+ChatGPT-hosted connection and install its plugin in the intended account. Then
+connect through Google and approve that client's KB grant. Account-available
+plugins can be used from ChatGPT mobile.
+
+The deployed `ClientRedirectUris` parameter must retain the existing loopback
+callbacks and include ChatGPT's exact callback. The server advertises RFC 9207
+issuer identification with a consistent issuer, so ChatGPT can use
+`https://chatgpt.com/connector_platform_oauth_redirect`. Confirm the exact URL
+shown in the ChatGPT connection settings. Do not use a callback wildcard.
+The native pipeline passes this parameter to the application as
+`PKB_CLIENT_REDIRECT_URIS`; update it through a reviewed bootstrap changeset and
+run the pinned pipeline release. The Google web client's redirect remains the
+broker's `https://mcp.midu.com.au/auth/callback`.
+
+On 21 October 2026, the pinned native pipeline deployed the exact ChatGPT
+callback alongside both existing loopback callbacks. Live checks passed:
+ChatGPT-style DCR HTTP 201, PKCE authorization reaching consent HTTP 302,
+unapproved callback rejection, and anonymous/invalid-token HTTP 401. Existing
+KB grants were unchanged and the synthetic OAuth records were removed. This
+verifies server compatibility; the account's ChatGPT sign-in and note retrieval
+still require testing through the installed hosted connection.
+
+Google sign-in and a KB access grant are separate steps. A ChatGPT registration
+has its own client ID and does not inherit a Codex grant. First call
+`get_access_status`, follow its owner approval link when required, then test
+`search_kb` and `fetch_note` in a new conversation with the plugin selected.
+
+See OpenAI's [custom MCP connection guide](https://developers.openai.com/api/docs/guides/custom-mcp-server),
+[callback requirements](https://developers.openai.com/plugins/build/auth), and
+[mobile plugin availability](https://learn.chatgpt.com/docs/plugins).
+
 ## Certificate choice
 
 Use a non-exportable public certificate issued by AWS Certificate Manager

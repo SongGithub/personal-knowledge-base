@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "sj-knowledge-base": {
+      "type": "streamable-http",
+      "url": "https://mcp.midu.com.au/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": { "mode": "dcr" },
+            "defaultScopes": [
+              "openid",
+              "https://www.googleapis.com/auth/userinfo.email"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
