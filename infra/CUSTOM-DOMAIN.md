@@ -71,8 +71,18 @@ callback alongside both existing loopback callbacks. Live checks passed:
 ChatGPT-style DCR HTTP 201, PKCE authorization reaching consent HTTP 302,
 unapproved callback rejection, and anonymous/invalid-token HTTP 401. Existing
 KB grants were unchanged and the synthetic OAuth records were removed. This
-verifies server compatibility; the account's ChatGPT sign-in and note retrieval
-still require testing through the installed hosted connection.
+verified server compatibility before connecting the account.
+
+The same day, Google sign-in completed through the hosted ChatGPT connection.
+The owner explicitly approved read, capture and ordinary-note updates for 365
+days. ChatGPT discovered all six tools and successfully checked access, searched
+for the synthetic domain-proof marker, and fetched the returned exact path with
+the expected revision and SHA256. The existing private sj-kb account plugin was
+updated to version 0.1.1 with a verified App dependency; its page now shows
+"Your cloud plugin" and "Connected". The portable repository package remains
+available separately. Private App IDs and account metadata stay outside Git.
+This verifies actual ChatGPT web reads. Write operations and the mobile app
+were not exercised in this acceptance test.
 
 Google sign-in and a KB access grant are separate steps. A ChatGPT registration
 has its own client ID and does not inherit a Codex grant. First call
