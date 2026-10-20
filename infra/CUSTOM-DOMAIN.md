@@ -19,8 +19,22 @@ issuer, protected-resource and OAuth endpoint metadata. The raw endpoint still
 enforces authentication. The first build's final HTTPS check timed out during
 DNS propagation; the deployment itself reached UPDATE_COMPLETE. A pinned retry
 then completed successfully, including the pipeline's DNS and HTTPS checks.
-Fresh authenticated acceptance remains tracked in
-[UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+A fresh Google sign-in through the custom endpoint reused an existing client
+registration and passed tool discovery, authorised read, synthetic capture,
+exact-revision fetch, idempotent retry, background indexing, and lexical/hybrid
+search. An attempted existing-note update was denied by the client's capture-only
+write scope. A live comparison confirmed the backend grant was unchanged.
+The synthetic capture's activity-log audit remains pending because that separate
+feature is disabled in this deployment; persistence and indexing both passed.
+Evidence is recorded in [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+
+The home router still returned a missing-record answer during acceptance, while
+Cloudflare and Google public resolvers and the deployment pipeline resolved the
+hostname successfully. With owner approval, Chrome temporarily used Cloudflare
+Secure DNS for sign-in and was then restored to OS default. The verifier used
+public DNS only for this hostname, with normal TLS hostname and certificate
+validation. No OS or router DNS settings were changed. Clients on the affected
+home resolver need its DNS answer to refresh before using the new URL normally.
 
 Clients should use the service URL above and reconnect through Google OAuth.
 Tokens belong to their issuer; an old-origin token is not proof of custom-origin

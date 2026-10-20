@@ -37,8 +37,11 @@ Deployment snapshot: **20 October 2026**, development environment in AWS Sydney
 - The MCP custom endpoint is `https://mcp.midu.com.au/mcp`. On 20 October 2026,
   CloudFormation deployed its domain/mapping and the pipeline published its
   DNS-only CNAME. TLS, health, anonymous/invalid-token rejection and canonical
-  OAuth metadata passed independent checks. Fresh authenticated acceptance is
-  tracked in [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+  OAuth metadata passed independent checks. A fresh Google sign-in using an
+  existing client passed capture, exact-revision fetch, idempotent retry,
+  lexical/hybrid search and update-scope denial checks. Its backend grant was
+  unchanged. See [UPS-58](https://jin-family.atlassian.net/browse/UPS-58) and the
+  [domain runbook](infra/CUSTOM-DOMAIN.md) for evidence and the local DNS caveat.
 - Copying notes to S3 and activating an index do not establish a completed
   source-of-truth cutover. Offline-device, cross-client write/read, migration,
   recovery and operational acceptance work remains tracked in the
