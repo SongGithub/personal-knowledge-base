@@ -77,10 +77,20 @@ class InfraLintTests(unittest.TestCase):
             template = json.loads((root / "infra" / name).read_text())
             statements = template["Resources"]["CloudFormationExecutionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
             create = next(item for item in statements if item.get("Sid") == "CreateRegionalMcpDomain")
+            # API Gateway v2 supplies these as ArrayOfString, even when each
+            # request contains only one endpoint and TLS policy.
+            multi = create["Condition"]["ForAllValues:StringEquals"]
+            self.assertEqual(multi, {
+                "apigateway:Request/EndpointType": ["REGIONAL"],
+                "apigateway:Request/SecurityPolicy": ["TLS_1_2"],
+            })
+            self.assertEqual(create["Condition"]["Null"], {
+                key: "false" for key in multi
+            })
             conditions = create["Condition"]["StringEquals"]
-            self.assertEqual(conditions["apigateway:Request/EndpointType"], "REGIONAL")
-            self.assertEqual(conditions["apigateway:Request/SecurityPolicy"], "TLS_1_2")
-            self.assertNotIn("apigateway:Request/RoutingMode", conditions)
+            self.assertEqual(set(conditions), {
+                "aws:RequestTag/Project", "aws:RequestTag/Environment",
+            })
             self.assertEqual(conditions["aws:RequestTag/Project"], {"Ref": "ProjectName"})
             self.assertEqual(conditions["aws:RequestTag/Environment"], {"Ref": "Environment"})
 
@@ -97,6 +107,10 @@ class InfraLintTests(unittest.TestCase):
                           if item.get("Sid") == "ManageOnlyMcpDomainAndMappings")
             self.assertTrue(all("mcp.midu.com.au" in resource["Fn::Sub"]
                                 for resource in domain["Resource"]))
+            encoded_tag_path = ("arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/"
+                                "arn%3A${AWS::Partition}%3Aapigateway%3A${AWS::Region}"
+                                "%3A%3A%2Fdomainnames%2Fmcp.midu.com.au")
+            self.assertIn({"Fn::Sub": encoded_tag_path}, domain["Resource"])
 
 
 if __name__ == "__main__":

@@ -53,6 +53,33 @@ pre-existing records fail closed; the pipeline will not overwrite them.
 After the first successful deployment, update the MCP clients to
 `https://mcp.midu.com.au/mcp` and verify the Google OAuth callback.
 
+## Deployment permission checks
+
+On 20 October 2026, UPS-57 verified actual domain and mapping creation with the
+intended CloudFormation role after correcting the IAM conditions and tagging
+path below. No organisation policy change was required. DNS, runtime URL and
+OAuth activation remain in [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+
+API Gateway v2 supplies `apigateway:Request/EndpointType` and
+`apigateway:Request/SecurityPolicy` as arrays. Both bootstrap variants use
+`ForAllValues:StringEquals` for the Regional/TLS 1.2 restrictions, with `Null`
+checks that reject missing values. Project and environment tags remain scalar
+`StringEquals` conditions. Simulating these keys as scalar strings can produce
+a false positive even when live creation fails. See the
+[API Gateway v2 condition types](https://docs.aws.amazon.com/service-authorization/latest/reference/list_apigatewayv2.html)
+and [IAM set operators](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-single-vs-multi-valued-context-keys.html).
+
+The tagging resource list also includes the exact URL-encoded domain ARN used
+by API Gateway's `/tags/` endpoint. Both encoded and unencoded paths remain
+restricted to `mcp.midu.com.au`; no general domain or tagging wildcard is needed.
+
+For permission acceptance, use the CloudFormation execution role to create the
+intended domain and `$default` API mapping in a temporary stack, without DNS or
+runtime URL changes. Check the actual domain and mapping, then delete that
+temporary stack before normal application deployment takes ownership. Keep
+private stack handles and raw AWS evidence outside Git. A simulator result or
+an issued ACM certificate alone does not establish live deployment permission.
+
 The API Gateway custom domain uses an AWS-managed certificate, so there is no
 certificate private key for Cloudflare or CI to store.
 
