@@ -35,8 +35,10 @@ Deployment snapshot: **20 October 2026**, development environment in AWS Sydney
   exact-revision fetch, idempotent retry, scope denial and background-indexing
   proof. Lexical and hybrid searches retrieve the saved synthetic note.
 - The raw API Gateway endpoint is available. The certificate for
-  `mcp.midu.com.au` is issued, but the custom hostname is **not live**: API
-  Gateway custom-domain creation awaits an AWS organisation permission change.
+  `mcp.midu.com.au` is issued, but the custom hostname is **not live**.
+  The deployment permission blocker was resolved and live domain/mapping
+  creation verified on 20 October 2026; DNS and OAuth activation remain in
+  [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
 - Copying notes to S3 and activating an index do not establish a completed
   source-of-truth cutover. Offline-device, cross-client write/read, migration,
   recovery and operational acceptance work remains tracked in the

@@ -1,5 +1,39 @@
 # AWS permission and infrastructure evidence
 
+## 2026-10-20 custom-domain permission resolution (UPS-57)
+
+The custom-domain blocker was an identity-policy mismatch. The historical
+CloudFormation failure explicitly reported that no identity-based policy allowed
+`apigateway:POST` on the domain collection. Current role simulations returned
+`AllowedByOrganizations=true`; no organisation policy change was needed.
+Organisation parent/policy inventory remains unavailable to the local operator,
+so this is evidence for these domain operations, not an audit of all SCPs.
+
+Both bootstrap templates now compare the array-valued API Gateway v2 endpoint
+and security-policy keys using `ForAllValues:StringEquals`, with `Null=false`
+checks. Project/environment tags, role trust and runtime boundaries are retained.
+A live retry then exposed the URL-encoded tagging resource used by API Gateway;
+the role now permits that exact path for `mcp.midu.com.au` as well.
+
+The changes were applied through reviewed bootstrap CloudFormation change sets
+that modified only the execution role's policy; dependent build resources
+re-evaluated unchanged role ARNs. Bootstrap reached UPDATE_COMPLETE. Seven
+simulations against the applied role allowed Regional/TLS 1.2 creation and
+denied mixed endpoint/TLS values, missing keys and incorrect project/environment
+tags. Eight infrastructure checks, six native-pipeline checks and template
+linting passed.
+
+An isolated temporary CloudFormation stack used the intended execution role
+to create the actual hostname with its issued ACM certificate and a `$default`
+mapping to the existing HTTP API. Both resources reached CREATE_COMPLETE and
+API Gateway reported the domain AVAILABLE. Cleanup reached DELETE_COMPLETE;
+the domain is absent, the application remains UPDATE_COMPLETE, and raw endpoint
+health returns HTTP 200. The application stack can own the domain during UPS-58.
+No DNS, runtime base URL, Google OAuth configuration or private KB data was
+changed by this permission task. Raw evidence stays in ignored private operator
+files; [the domain guide](../../infra/CUSTOM-DOMAIN.md) records the deployment
+contract. UPS-58 remains responsible for hostname activation and client checks.
+
 **Original audit**: 2026-10-17. Authenticated access and representative deployment
 policy checks succeeded, while GitHub OIDC provider operations were denied.
 **2026-10-18 update**: the permitted native CodeBuild route has created the

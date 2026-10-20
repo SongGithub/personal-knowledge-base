@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Allow the scoped deployment role to create the MCP custom domain using API
+  Gateway v2's array-valued IAM conditions and exact encoded tagging path.
+
 ## Cloud KB 0.3.0
 
 ### Added
