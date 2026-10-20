@@ -1,9 +1,97 @@
 # MCP custom domain
 
-The intended service URL is `https://mcp.midu.com.au/mcp`. The HTTP API remains
+The service URL is `https://mcp.midu.com.au/mcp`. The HTTP API remains
 in `ap-southeast-2`, with a Regional API Gateway custom domain and TLS 1.2.
 Cloudflare remains the authoritative DNS provider; the root `midu.com.au` record
 is not involved.
+
+## Activation evidence
+
+On 20 October 2026, the existing CodeBuild pipeline deployed the custom domain
+and mapping from merged commit `68ced971e2d67d64b9fcfb1e6bbcdf77b27a5f38`.
+It reads the DNS token's JSON key from the exact AWS Secrets Manager reference.
+The Google web client's custom callback is configured alongside the existing
+raw and loopback callbacks. No grants were widened by deployment.
+
+Independent checks confirm a DNS-only CNAME, a valid certificate for the
+hostname, health HTTP 200, anonymous and invalid-token HTTP 401, and custom-origin
+issuer, protected-resource and OAuth endpoint metadata. The raw endpoint still
+enforces authentication. The first build's final HTTPS check timed out during
+DNS propagation; the deployment itself reached UPDATE_COMPLETE. A pinned retry
+then completed successfully, including the pipeline's DNS and HTTPS checks.
+A fresh Google sign-in through the custom endpoint reused an existing client
+registration and passed tool discovery, authorised read, synthetic capture,
+exact-revision fetch, idempotent retry, background indexing, and lexical/hybrid
+search. An attempted existing-note update was denied by the client's capture-only
+write scope. A live comparison confirmed the backend grant was unchanged.
+The synthetic capture's activity-log audit remains pending because that separate
+feature is disabled in this deployment; persistence and indexing both passed.
+Evidence is recorded in [UPS-58](https://jin-family.atlassian.net/browse/UPS-58).
+
+The home router still returned a missing-record answer during acceptance, while
+Cloudflare and Google public resolvers and the deployment pipeline resolved the
+hostname successfully. With owner approval, Chrome temporarily used Cloudflare
+Secure DNS for sign-in and was then restored to OS default. The verifier used
+public DNS only for this hostname, with normal TLS hostname and certificate
+validation. No OS or router DNS settings were changed. Clients on the affected
+home resolver need its DNS answer to refresh before using the new URL normally.
+
+Clients should use the service URL above and reconnect through Google OAuth.
+Tokens belong to their issuer; an old-origin token is not proof of custom-origin
+access. Reusing a registered client identity preserves its existing backend grant;
+a client that registers a new identity needs separate owner approval.
+
+## ChatGPT web and mobile
+
+Codex's local MCP configuration does not create a ChatGPT connection. The
+portable package in [`plugins/sj-kb`](../plugins/sj-kb/) defines the existing
+HTTPS endpoint with OAuth dynamic client registration (DCR). It contains no
+credentials or private notes. A portable package alone may show a desktop
+install path; verify the actual installation surface before claiming mobile
+availability.
+
+For ChatGPT, open Plugins on the web, choose Add custom MCP server, enter
+`https://mcp.midu.com.au/mcp`, and select OAuth with DCR. Use the resulting
+ChatGPT-hosted connection and install its plugin in the intended account. Then
+connect through Google and approve that client's KB grant. Account-available
+plugins can be used from ChatGPT mobile.
+
+The deployed `ClientRedirectUris` parameter must retain the existing loopback
+callbacks and include ChatGPT's exact callback. The server advertises RFC 9207
+issuer identification with a consistent issuer, so ChatGPT can use
+`https://chatgpt.com/connector_platform_oauth_redirect`. Confirm the exact URL
+shown in the ChatGPT connection settings. Do not use a callback wildcard.
+The native pipeline passes this parameter to the application as
+`PKB_CLIENT_REDIRECT_URIS`; update it through a reviewed bootstrap changeset and
+run the pinned pipeline release. The Google web client's redirect remains the
+broker's `https://mcp.midu.com.au/auth/callback`.
+
+On 21 October 2026, the pinned native pipeline deployed the exact ChatGPT
+callback alongside both existing loopback callbacks. Live checks passed:
+ChatGPT-style DCR HTTP 201, PKCE authorization reaching consent HTTP 302,
+unapproved callback rejection, and anonymous/invalid-token HTTP 401. Existing
+KB grants were unchanged and the synthetic OAuth records were removed. This
+verified server compatibility before connecting the account.
+
+The same day, Google sign-in completed through the hosted ChatGPT connection.
+The owner explicitly approved read, capture and ordinary-note updates for 365
+days. ChatGPT discovered all six tools and successfully checked access, searched
+for the synthetic domain-proof marker, and fetched the returned exact path with
+the expected revision and SHA256. The existing private sj-kb account plugin was
+updated to version 0.1.1 with a verified App dependency; its page now shows
+"Your cloud plugin" and "Connected". The portable repository package remains
+available separately. Private App IDs and account metadata stay outside Git.
+This verifies actual ChatGPT web reads. Write operations and the mobile app
+were not exercised in this acceptance test.
+
+Google sign-in and a KB access grant are separate steps. A ChatGPT registration
+has its own client ID and does not inherit a Codex grant. First call
+`get_access_status`, follow its owner approval link when required, then test
+`search_kb` and `fetch_note` in a new conversation with the plugin selected.
+
+See OpenAI's [custom MCP connection guide](https://developers.openai.com/api/docs/guides/custom-mcp-server),
+[callback requirements](https://developers.openai.com/plugins/build/auth), and
+[mobile plugin availability](https://learn.chatgpt.com/docs/plugins).
 
 ## Certificate choice
 
