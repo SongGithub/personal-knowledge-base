@@ -9,8 +9,8 @@ from botocore.exceptions import ClientError
 
 
 MAX_NOTE_BYTES = 256 * 1024
-CAPTURE_ROOTS = ("Ideas/", "Resources/_Review/AI Learning/")
 UPDATE_ROOTS = ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/")
+CAPTURE_ROOTS = UPDATE_ROOTS
 
 
 def validate_update_prefix(prefix):
@@ -63,11 +63,13 @@ def update_requires_review(path, content):
 
 
 def validate_capture_prefix(prefix: str) -> str:
-    """Accept only the supported raw-capture trees; grants must narrow them."""
+    """Accept ordinary note destinations, preserving policy/snapshot protections."""
     if (not isinstance(prefix, str) or not prefix.endswith("/") or
             not prefix.startswith(CAPTURE_ROOTS)):
         raise ValueError("invalid_capture_destination")
-    normalize_path(prefix + "scope.md")
+    path = normalize_path(prefix + "scope.md")
+    if update_requires_review(path, ""):
+        raise ValueError("invalid_capture_destination")
     return prefix
 
 

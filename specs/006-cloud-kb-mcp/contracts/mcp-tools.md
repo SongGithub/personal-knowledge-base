@@ -31,10 +31,10 @@ review remain proposed work in the current implementation.
 |---|---|---|---|
 | `search_kb` | query, bounded limit, strategy | `kb:read` plus visible paths | Permitted paths/excerpts, authority tiers, indexed source revisions, snapshot/contract IDs, freshness and pending-change indication |
 | `fetch_note` | normalized exact path, optional permitted revision, bounded max_chars | `kb:read` for current/historical access as applicable | Markdown, revision, truncation, authority and separate indexed/current status; works without a fresh index |
-| `capture_learning` | operation_id, exact granted raw-capture destination, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
+| `capture_learning` | operation_id, granted ordinary destination or subfolder, title, raw Markdown, origin/date, evidence links, inference labels | `kb:capture` for destination | Durable path/revision receipt; `status: unverified`; audit/index statuses |
 | `update_note` | operation_id, exact path, expected_revision, unique old_text/new_text passage, origin, date, evidence_links, inference_labels | `kb:update` and read access for path | Conditional saved revision for ordinary notes; protected content returns review_required/forbidden |
 | `get_change_status` | authorized operation_id | Access to the originating operation/path | Review, persistence, activity-audit and indexing states, receipt if committed, bounded failure/retry information |
-| `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes; owner-only access management URL, 90/365-day choices and renewal indication; no note content or other clients' grants |
+| `get_access_status` | none | Authentication only | Caller's client ID, owner-match flag, verified email when available and current grant presence/revocation/expiry/scopes and read/capture/update prefixes; owner-only access management URL, 90/365-day choices and renewal indication; no note content or other clients' grants |
 
 Bounds: query <=2,000 characters; search limit 1–10; fetch max_chars 1–20,000;
 capture title <=200 characters, Markdown <=12,000 characters, origin <=500,
@@ -42,10 +42,11 @@ evidence <=10 URLs of <=2,048 characters and 4,000 characters total, and
 operation ID <=128 characters. Complete rendered UTF-8 Markdown, including
 provenance, must be <=24,576 bytes; larger captures fail before any write.
 Search tokens do not acquire mutation rights. Captures can write only below
-an exact owner-granted prefix under `Ideas/` or
-`Resources/_Review/AI Learning/`; the runtime role and writer enforce those
-trees. Other Resources folders, maintained notes and canonical content are
-outside this capture boundary. The owner browser page offers 90 or 365 days,
+owner-granted ordinary folders or their subfolders: Ideas, Projects, Areas,
+Resources, Personal Facts and Templates. Full write approvals grant these roots;
+learning-only approvals retain `Resources/_Review/AI Learning/`. The runtime role
+and boundary require `If-None-Match` for creation and `If-Match` for updates.
+Wiki, policy files and source snapshots remain protected. The owner browser page offers 90 or 365 days,
 defaulting to 365, and can renew or revoke the exact client grant. Existing
 grants keep their approved expiry until explicitly renewed. The legacy
 operator provisioning tool retains its 90-day maximum.
@@ -64,7 +65,7 @@ unless an explicitly permitted maintained-note operation applies.
 Existing registered connectors may keep sending `learning`, `date` and
 `evidence_links`; these are aliases for `markdown`, `created_date` and `evidence`.
 Conflicting values are rejected. The legacy destination `learning` resolves only
-to `Resources/_Review/AI Learning/` and still requires that exact granted prefix.
+to `Resources/_Review/AI Learning/` and requires a grant covering that folder.
 Both request forms share the same operation digest and persistence receipt.
 
 ## Persistence and retries

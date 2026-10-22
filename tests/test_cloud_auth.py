@@ -81,7 +81,7 @@ class AuthStoreTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError) as raised:
             gate.capture_prefixes(Token())
         self.assertIn("malformed_grant", str(raised.exception))
-        for prefix in ("Resources/", "Resources/_Review/", "Resources/_Review/AI Learning-secret/",
+        for prefix in ("Archive/", "Resources/Source Snapshots/", "Areas/AGENTS.md/",
                        "Ideas/../Wiki/", "Ideas//", None):
             grant["CapturePrefixes"] = [prefix]
             with self.subTest(prefix=prefix), self.assertRaises(ToolError):
@@ -162,7 +162,9 @@ class GrantDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                                               "email": "owner@example.invalid"})
         self.assertEqual(status["grant"], {"present": True, "revoked": False,
                                            "expires_at": grant["ExpiresAt"],
-                                           "scopes": ["kb:capture", "kb:read"]})
+                                           "scopes": ["kb:capture", "kb:read"],
+                                           "read_prefixes": grant["Prefixes"],
+                                           "capture_prefixes": [], "update_prefixes": []})
 
         missing = GrantGate(EmptyTable(), "owner").status(Token())
         self.assertEqual(missing["grant"], {"present": False, "revoked": None,

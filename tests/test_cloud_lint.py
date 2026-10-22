@@ -27,30 +27,36 @@ class InfraLintTests(unittest.TestCase):
     def test_misspelled_iam_actions_still_fail(self):
         self.assertTrue(self.permissions("apigateway:TagResorce"))
 
-    def test_api_note_writes_are_limited_to_raw_capture_trees(self):
+    def test_api_note_creates_are_conditional_and_limited_to_ordinary_folders(self):
         template = json.loads((Path(__file__).parents[1] /
                                "infra/foundation.template.json").read_text())
         statements = template["Resources"]["ApiExecutionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
         write = next(item for item in statements if item.get("Sid") == "WriteKnowledgeThroughBackendPolicy")
         self.assertEqual(write["Action"], "s3:PutObject")
-        self.assertEqual(write["Resource"], [
-            {"Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"},
-            {"Fn::Sub": "${DataBucket.Arn}/notes/Resources/_Review/AI Learning/*"},
-        ])
+        self.assertEqual(write["Condition"], {"Null": {"s3:if-none-match": "false"}})
+        self.assertEqual({row["Fn::Sub"].split("/notes/", 1)[1] for row in write["Resource"]},
+                         {root + "*" for root in ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/")})
 
-    def test_runtime_boundary_only_allows_note_puts_under_raw_capture_trees(self):
+    def test_runtime_boundary_only_allows_conditional_creates_in_ordinary_folders(self):
         root = Path(__file__).parents[1]
         for name in ("bootstrap.template.json", "native-pipeline.template.json"):
             template = json.loads((root / "infra" / name).read_text())
             statements = template["Resources"]["RuntimePermissionsBoundary"]["Properties"]["PolicyDocument"]["Statement"]
             write = next(item for item in statements
-                         if item.get("Effect") == "Allow" and item.get("Action") == "s3:PutObject")
+                         if item.get("Sid") == "CreateOrdinaryNotesConditionally")
+            self.assertEqual(write["Condition"], {"Null": {"s3:if-none-match": "false"}})
             vault_resources = [resource["Fn::Sub"] for resource in write["Resource"]
                                if "-vault-" in resource["Fn::Sub"]]
             prefix = "arn:${AWS::Partition}:s3:::${ProjectName}-${Environment}-vault-${AWS::AccountId}-${AWS::Region}/notes/"
             self.assertEqual(set(vault_resources), {
-                prefix + "Ideas/*", prefix + "Resources/_Review/AI Learning/*",
+                prefix + root + "*" for root in ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/")
             })
+            # No other statement may restore unconditional note overwrites.
+            for statement in statements:
+                if statement.get("Effect") == "Allow" and statement.get("Action") == "s3:PutObject":
+                    if any("/notes/" in row["Fn::Sub"] and "/Wiki/Activity Log.md" not in row["Fn::Sub"]
+                           for row in statement["Resource"]):
+                        self.assertIn("Condition", statement)
 
     def test_ordinary_updates_require_if_match_and_history_is_prefix_scoped(self):
         # This job intentionally installs only infrastructure validators, not

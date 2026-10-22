@@ -7,6 +7,20 @@
 - Allow the scoped deployment role to create the MCP custom domain using API
   Gateway v2's array-valued IAM conditions and exact encoded tagging path.
 
+## Cloud KB 0.4.0 — 2026-10-22
+
+- Full write grants now permit new notes throughout Ideas, Projects, Areas,
+  Resources, Personal Facts and Templates, including subfolders. Previously,
+  these grants could update ordinary notes but create only in the learning
+  review folder. Learning-only grants retain their narrower destination.
+- Access status reports the caller's read, capture and update folders. Capture
+  errors identify allowed destinations when a folder is outside the grant.
+- AWS permissions require conditional creation or revision-checked updates.
+  Wiki, policy and source-snapshot protections remain in place.
+- Existing client grants require an explicit owner-authorised migration or
+  browser approval of the full write option; deployments do not widen grants
+  or extend their expiry automatically.
+
 ## Cloud KB 0.3.0
 
 ### Added

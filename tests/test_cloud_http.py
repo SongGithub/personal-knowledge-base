@@ -29,6 +29,8 @@ from cloud_kb.auth import GrantGate
 from cloud_kb.search import CONTRACT, SnapshotSearch
 from cloud_kb.storage import S3Notes
 from cloud_kb.writer import LearningWriter, render_markdown
+from tests.test_cloud_writer import FakeS3, FakeTable
+from types import SimpleNamespace
 
 
 PATH = "Resources/MCP Demo/Mock orchard.md"
@@ -82,6 +84,48 @@ def response(raw):
 
 
 class CloudHTTPTests(unittest.TestCase):
+    def test_ordinary_folder_creation_and_prefix_boundaries_over_mcp(self):
+        async def proof():
+            table, s3 = FakeTable(), FakeS3()
+            roots = ["Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/"]
+            table.items["GRANT#owner", "CLIENT#client"] = {"Revoked": False, "ExpiresAt": int(time.time()) + 300,
+                "Scopes": ["kb:read", "kb:capture", "kb:update"], "Prefixes": roots,
+                "CapturePrefixes": roots, "UpdatePrefixes": roots}
+            pair, origin = RSAKeyPair.generate(), "https://synthetic-kb.invalid"
+            verifier = JWTVerifier(public_key=pair.public_key, issuer=origin, audience="synthetic", required_scopes=["kb:read"])
+            app = create_app(auth_provider=verifier, gate=GrantGate(table, "owner", origin),
+                             notes=S3Notes(s3, "synthetic-vault"),
+                             search=SimpleNamespace(search=lambda *args: {"results": []}),
+                             writer=LearningWriter(s3, table, "synthetic-vault"), base_url=origin)
+            token = pair.create_token(subject="owner", issuer=origin, audience="synthetic", scopes=["kb:read"],
+                                      additional_claims={"client_id": "client"})
+            def factory(**kwargs):
+                return httpx2.AsyncClient(**{**kwargs, "transport": httpx2.ASGITransport(app)})
+            transport = StreamableHttpTransport(origin + "/mcp", auth=token, httpx_client_factory=factory)
+            async with app.router.lifespan_context(app), Client(transport) as client:
+                access = (await client.call_tool("get_access_status", {})).data
+                self.assertEqual(access["grant"]["capture_prefixes"], roots)
+                args = {"operation_id": "wire-ordinary", "destination": "Ideas/", "title": "Synthetic ordinary capture",
+                        "markdown": "Synthetic verification.", "origin": "synthetic test", "created_date": "2026-10-22"}
+                for index, folder in enumerate(roots + ["Areas/Career/", "Resources/_Review/AI Learning/"]):
+                    saved = (await client.call_tool("capture_learning", {**args, "operation_id": f"wire-{index}",
+                                                                         "destination": folder})).data
+                    self.assertEqual(saved["persistence"], "persisted")
+                    fetched = (await client.call_tool("fetch_note", {"path": saved["path"]})).data
+                    self.assertIn("Synthetic verification.", fetched["content"])
+                before = dict(s3.objects)
+                for folder in ("Wiki/", "Archive/", "Ideas/../Wiki/", "Areas/Source Snapshots/"):
+                    with self.subTest(folder=folder), self.assertRaises(ToolError):
+                        await client.call_tool("capture_learning", {**args, "destination": folder})
+                self.assertEqual(s3.objects, before)
+                table.items["GRANT#owner", "CLIENT#client"]["CapturePrefixes"] = ["Resources/_Review/AI Learning/"]
+                with self.assertRaises(ToolError) as raised:
+                    await client.call_tool("capture_learning", args)
+                self.assertIn("capture_destination_not_granted", str(raised.exception))
+                with self.assertRaises(ToolError):
+                    await client.call_tool("capture_learning", {**args, "destination": "Resources/_Review/AI Learning-secret/"})
+        asyncio.run(proof())
+
     def test_mock_markdown_over_authenticated_http(self):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))

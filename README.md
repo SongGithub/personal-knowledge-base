@@ -106,10 +106,11 @@ Capture writes a new note marked `unverified`; it does not approve or overwrite
 canonical Wiki content. Identical operation retries are idempotent, and reusing
 an operation ID with different content is rejected.
 
-The local implementation accepts granted destinations under `Ideas/` or
-`Resources/_Review/AI Learning/`. The latter matches the owner's approved
-learning-review folder. A client must supply its exact granted prefix; support
-for a folder does not grant access to it. The owner access page offers 90 days
+Write-enabled grants allow new notes under Ideas, Projects, Areas, Resources,
+Personal Facts and Templates, including subfolders. Create-only learning grants
+remain limited to `Resources/_Review/AI Learning/`. `get_access_status` reports
+the actual read, capture and update prefixes for the caller; folder support
+alone does not grant access. The owner access page offers 90 days
 or one year (365 days), defaulting to one year, with explicit renewal/revocation.
 
 Persistence and indexing are separate outcomes. A saved note can be fetched
@@ -184,8 +185,9 @@ with an exact, unique `old_text` / `new_text` replacement. Other text is preserv
 
 The same page supports revocation and renewal, including after expiry. Existing
 grants keep their current expiry until renewed. MCP tokens cannot approve
-grants, and grants do not silently extend. Capture remains restricted to
-`Resources/_Review/AI Learning/`. Updates are a separate explicit permission;
+grants, and grants do not silently extend. The write option enables both new-note
+creation and updates throughout ordinary folders; the learning-only option
+retains its review-folder restriction. Updates are a separate explicit permission;
 Wiki, policy/AGENTS notes, verified knowledge and source snapshots remain
 protected, and no file deletion is enabled. See [ordinary note updates](specs/006-cloud-kb-mcp/note-updates.md).
 This flow needs no AWS credentials or operator intervention.

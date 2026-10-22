@@ -191,6 +191,9 @@ class GrantGate:
                 "revoked": bool(grant.get("Revoked", True)),
                 "expires_at": int(float(grant["ExpiresAt"])) if "ExpiresAt" in grant else None,
                 "scopes": sorted(grant.get("Scopes", [])),
+                "read_prefixes": grant.get("Prefixes", []),
+                "capture_prefixes": grant.get("CapturePrefixes", []),
+                "update_prefixes": grant.get("UpdatePrefixes", []),
             }
             if self.base_url:
                 result["access_management"]["renewal_required"] = (
