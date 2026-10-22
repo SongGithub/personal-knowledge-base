@@ -5,7 +5,7 @@ import time
 import uuid
 
 from botocore.exceptions import ClientError
-from cloud_kb.storage import UPDATE_ROOTS
+from cloud_kb.storage import CAPTURE_ROOTS, UPDATE_ROOTS
 
 
 READ_PREFIXES = ("Ideas/", "Projects/", "Areas/", "Resources/", "Archive/",
@@ -42,9 +42,10 @@ class GrantDecisions:
                     "Scopes": ["kb:read"] + (["kb:capture"] if mode in {"capture", "write"} else []) +
                               (["kb:update"] if mode == "write" else []),
                     "Prefixes": sorted(READ_PREFIXES),
-                    "CapturePrefixes": [CAPTURE_PREFIX] if mode in {"capture", "write"} else [],
+                    "CapturePrefixes": (list(CAPTURE_ROOTS) if mode == "write" else
+                                        [CAPTURE_PREFIX] if mode == "capture" else []),
                     "UpdatePrefixes": list(UPDATE_ROOTS) if mode == "write" else [],
-                    "PolicyRevision": "ordinary-update-v1"}
+                    "PolicyRevision": "ordinary-write-v2"}
         else:
             item = {**previous, "Revoked": True}
         item.update(GrantVersion=version, ApprovedAt=now, ApprovalMethod="owner-google-browser-v1")

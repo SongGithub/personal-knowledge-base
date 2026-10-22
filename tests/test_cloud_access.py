@@ -196,6 +196,7 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         saved = self.portal.grants.get("client-one")
         self.assertEqual(set(saved["Scopes"]), {"kb:read", "kb:capture", "kb:update"})
         self.assertEqual(saved["UpdatePrefixes"], list(UPDATE_ROOTS))
+        self.assertEqual(saved["CapturePrefixes"], list(UPDATE_ROOTS))
         self.assertEqual(saved["ExpiresAt"] - saved["CreatedAt"], 365 * 86400)
         self.assertNotIn("Wiki/", saved["UpdatePrefixes"])
         self.assertEqual((await self.post(await self.form())).status_code, 200)

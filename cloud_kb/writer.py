@@ -8,7 +8,7 @@ import time
 from botocore.exceptions import BotoCoreError, ClientError
 
 from cloud_kb.activity import AUDIT_CONTRACT
-from cloud_kb.storage import normalize_path, validate_capture_prefix
+from cloud_kb.storage import normalize_path, permitted, validate_capture_prefix
 
 
 MAX_TITLE = 200
@@ -50,7 +50,7 @@ def render_markdown(*, title, markdown, origin, created_date, evidence, inferenc
 
 
 class LearningWriter:
-    """Writes only new, unverified captures under an exact grant-configured prefix."""
+    """Writes only new, unverified captures under a grant-configured prefix."""
 
     def __init__(self, s3, table, bucket, indexed_sha256=None, activity_log=None):
         self.s3, self.table, self.bucket = s3, table, bucket
@@ -62,12 +62,12 @@ class LearningWriter:
                 allowed_prefixes):
         if not isinstance(operation_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", operation_id):
             raise ValueError("invalid_operation_id")
-        if destination not in allowed_prefixes:
-            raise ValueError("forbidden")
         try:
             validate_capture_prefix(destination)
         except ValueError:
             raise ValueError("forbidden") from None
+        if not permitted(destination + "scope.md", allowed_prefixes):
+            raise ValueError("forbidden")
         title = _text(title, MAX_TITLE, "title")
         if any(ord(char) < 32 for char in title):
             raise ValueError("invalid_title")

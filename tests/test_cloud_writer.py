@@ -153,13 +153,23 @@ class WriterTests(unittest.TestCase):
         prefix = "Resources/_Review/AI Learning/"
         result = self.writer.capture(**{**self.arguments, "destination": prefix, "allowed_prefixes": [prefix]})
         self.assertTrue(result["path"].startswith(prefix))
-        for destination in ("Resources/", "Resources/_Review/Other/", "Wiki/", "Areas/",
-                            "Resources/_Review/AI Learning-secret/", "Ideas/../Wiki/"):
+        for destination in ("Wiki/", "Archive/", "Areas/Source Snapshots/", "Ideas/../Wiki/"):
             with self.subTest(destination=destination), self.assertRaises(ValueError):
                 self.writer.capture(**{**self.arguments, "destination": destination,
                                        "allowed_prefixes": [destination]})
         with self.assertRaisesRegex(ValueError, "forbidden"):
             self.writer.capture(**{**self.arguments, "destination": "Ideas/", "allowed_prefixes": [prefix]})
+
+    def test_new_notes_can_be_captured_in_each_granted_ordinary_folder(self):
+        roots = ["Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/"]
+        for index, destination in enumerate(roots + ["Areas/Career/", "Resources/_Review/AI Learning/"]):
+            with self.subTest(destination=destination):
+                result = self.writer.capture(**{**self.arguments, "operation_id": f"ordinary-{index}",
+                                             "destination": destination, "allowed_prefixes": roots})
+                self.assertEqual(result["persistence"], "persisted")
+                self.assertTrue(result["path"].startswith(destination))
+        with self.assertRaisesRegex(ValueError, "forbidden"):
+            self.writer.capture(**{**self.arguments, "destination": "Areas/Career/", "allowed_prefixes": ["Ideas/"]})
 
     def test_utf8_size_limit_applies_before_any_write(self):
         with self.assertRaisesRegex(ValueError, "capture_too_large"):

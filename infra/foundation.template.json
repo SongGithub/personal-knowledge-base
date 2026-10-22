@@ -682,13 +682,14 @@
                   "Effect": "Allow",
                   "Action": "s3:PutObject",
                   "Resource": [
-                    {
-                      "Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"
-                    },
-                    {
-                      "Fn::Sub": "${DataBucket.Arn}/notes/Resources/_Review/AI Learning/*"
-                    }
-                  ]
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Ideas/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Projects/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Areas/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Resources/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Personal Facts/*"},
+                    {"Fn::Sub": "${DataBucket.Arn}/notes/Templates/*"}
+                  ],
+                  "Condition": {"Null": {"s3:if-none-match": "false"}}
                 },
                 {
                   "Sid": "UpdateOrdinaryNotesConditionally",

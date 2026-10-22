@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.routing import Route
 
 from cloud_kb.grants import CAPTURE_PREFIX, GRANT_DAYS, GrantDecisions, digest
-from cloud_kb.storage import UPDATE_ROOTS
+from cloud_kb.storage import CAPTURE_ROOTS, UPDATE_ROOTS
 
 
 SESSION_COOKIE = "__Host-kb-owner"
@@ -244,7 +244,8 @@ class OwnerAccess:
                     '<p class="muted">The client supplies its name. Check its ID and callback before approving.</p>'
                     f"<ul>{callbacks}</ul><p>{escape(current)}</p>"
                     '<h2>Permissions</h2><ul><li>Read all configured KB folders.</li>'
-                    f'<li>Optional: create new notes only in <code>{escape(CAPTURE_PREFIX)}</code>.</li>'
+                    f'<li>The learning-only option creates notes in <code>{escape(CAPTURE_PREFIX)}</code>.</li>'
+                    '<li>The create and update option also allows new notes in: ' + escape(", ".join(CAPTURE_ROOTS)) + ' and their subfolders.</li>'
                     '<li>Optional ordinary-note updates in: ' + escape(", ".join(UPDATE_ROOTS)) + '.</li>'
                     '<li>Updates require a fetched revision and an exact passage match. '
                     'Wiki, policies, verified notes and source snapshots remain protected.</li>'

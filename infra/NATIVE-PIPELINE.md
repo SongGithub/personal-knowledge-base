@@ -86,16 +86,16 @@ the login URL privately for controlled browser use.
 
 After a write-enabled release, use `tools/grant_mcp_client.py` from an owner
 operator session to grant one authenticated client `kb:capture` on an exact
-prefix under `Ideas/` or `Resources/_Review/AI Learning/`.
+ordinary prefix under Ideas, Projects, Areas, Resources, Personal Facts or Templates.
 The helper checks the deployed owner binding, expires grants within 90 days,
 preserves any still-active grant, and supports the standard AWS SDK chain
 (including an SSO profile). Add `--scope kb:read --read-prefix Ideas/` only when
 that same client also needs to retrieve its captures. No grant is created by
 deployment or Google sign-in alone.
 
-Use only the owner-approved destination and duration. The current learning
-approval is for `Resources/_Review/AI Learning/`, with no existing-note edits,
-for 90 days from the original activation. Do not extend that expiry when
+Use only the owner-approved destination and duration. Learning-only browser
+approvals remain at `Resources/_Review/AI Learning/`; full write approvals cover
+ordinary folders for both creation and revision-checked updates. Do not extend that expiry when
 redeploying. Keep existing read prefixes and do not replace an active grant
 merely to match an example command. The foundation API policy and both runtime
 boundary templates must support the chosen folder before enabling the corrected

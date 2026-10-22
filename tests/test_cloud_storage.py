@@ -6,10 +6,20 @@ import boto3
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
 
-from cloud_kb.storage import S3Notes, normalize_path, permitted
+from cloud_kb.storage import S3Notes, normalize_path, permitted, validate_capture_prefix
 
 
 class CloudStorageTests(unittest.TestCase):
+    def test_capture_supports_ordinary_folders_and_rejects_protected_destinations(self):
+        for prefix in ("Ideas/", "Projects/", "Areas/", "Resources/", "Personal Facts/", "Templates/",
+                       "Areas/Career/", "Resources/_Review/AI Learning/"):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(validate_capture_prefix(prefix), prefix)
+        for prefix in ("Wiki/", "Archive/", "Clippings/", "Ideas/../Wiki/", "Ideas//",
+                       "Areas/Source Snapshots/", "Resources/Archive/", "Areas/AGENTS.md/", "Ideas/Wiki/"):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                validate_capture_prefix(prefix)
+
     def test_paths_and_grants(self):
         for path in ("../private.md", "/absolute.md", "Wiki//note.md", "Wiki/./note.md", "Wiki\\note.md", ".env", "notes.txt"):
             with self.subTest(path=path), self.assertRaises(ValueError):
