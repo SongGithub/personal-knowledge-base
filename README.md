@@ -1,11 +1,17 @@
 # Personal Knowledge Base
 
-> The value of a knowledge base = knowledge density × retrieval frequency ×
-> depth of verification
+> Your knowledge stays with you when your AI changes.
 
-A personal knowledge service for making experience compound across AI tools.
-Assistants retrieve relevant context about the owner's experience, decisions and
-ways of working, then capture useful new learning for later retrieval.
+A personal knowledge service designed to give Claude, ChatGPT and OpenClaw one
+authoritative record of the owner's facts, decisions and lessons. MCP provides
+a shared interface for retrieving evidence and capturing new learning, so
+changing assistants requires less rebuilding of context.
+
+The value is continuity across providers: maintain knowledge once, reuse it
+through compatible clients, and keep control of the record as models and
+subscriptions change. Each client surface still needs compatible MCP/OAuth
+support, onboarding and its own access grant; naming a client here describes
+the intended use, not completed acceptance on every surface.
 
 The project started with an Obsidian Markdown vault and a local MCP server.
 Its second generation adds an authenticated cloud MCP service on AWS, so access
@@ -17,6 +23,59 @@ synthetic fixtures. Private notes, embeddings, credentials and owner-specific
 evaluation cases stay outside Git.**
 
 [Project case study and Miro diagrams](https://www.midu.com.au/work/personal-knowledge-base/)
+
+## Why a separate knowledge base?
+
+Native assistant memory can remain useful alongside the KB. This project
+provides an independent, inspectable record that authorised assistants can
+share through MCP.
+
+- **Less provider lock-in:** keep facts, decision rationale and lessons in
+  portable Markdown when changing models or clients.
+- **Less repeated briefing:** retrieve relevant context from the same record
+  instead of maintaining a separate version in each assistant.
+- **A record the owner controls:** retain sources and dates, distinguish
+  proposed learning from approved knowledge, and review canonical changes.
+
+Canonical means the designated, owner-approved record; it does not mean every
+claim is infallible. MCP abstracts access, while client instructions and the
+review workflow establish authority. Assistants should consult relevant KB
+evidence and surface conflicts with their own recollections for resolution.
+
+## How experience compounds
+
+The operating model is **retrieve → apply → observe → capture → review →
+reuse**. Experience compounds when a reviewed lesson changes later work and
+its outcome is checked. Saving notes or generating embeddings alone does not
+demonstrate that improvement.
+
+1. Retrieve relevant past decisions, evidence and lessons before starting.
+2. Apply them to the task and record the actual outcome, including failures.
+3. Have AI propose a short learning: context, action, result, supporting
+   evidence, where it may apply and what remains uncertain.
+4. Review proposals in small batches. The owner approves changes to canonical
+   facts, preferences and reusable methods; AI-written captures stay unverified.
+5. Reuse an approved lesson in a later task, link the outcome back to it, and
+   revise or retire it when the evidence changes.
+
+For example, a hypothetical deployment failure might suggest a preflight
+check. AI can link the incident evidence and draft that check; the owner reviews
+its scope before adoption. A later deployment tests whether the check helped.
+The next assistant can retrieve that reviewed lesson without repeating the
+original investigation.
+
+AI can assist with retrieval, capture, duplicate detection, synthesis and
+review preparation. Human oversight decides what becomes authoritative and
+whether a proposed generalisation is justified. This is the intended workflow;
+the current service provides retrieval and bounded write primitives, rather
+than an autonomous system that verifies and promotes lessons.
+
+Measure compounding through later reuse, corrections, repeated mistakes and
+time to a usable result. The synthetic retrieval benchmark below measures
+ranking quality, not experience compounding or productivity gains.
+
+Working principle: **knowledge density × retrieval frequency × depth of
+verification**.
 
 ## Current status
 
